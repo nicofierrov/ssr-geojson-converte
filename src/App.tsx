@@ -10,9 +10,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
-import { Globe, Warning, Check, DownloadSimple } from '@phosphor-icons/react'
-import { processStructuredPDF, generateGeoJSONFromStructuredData } from '@/lib/structuredPdfProcessor'
-import type { VertexData, TankData } from '@/lib/structuredPdfProcessor'
+import { Globe, Warning, Check, DownloadSimple, Clock } from '@phosphor-icons/react'
+import { processSlowPDF, generateGeoJSONFromSlowData } from '@/lib/slowPdfProcessor'
+import type { VertexData, TankData, PageAnalysis } from '@/lib/slowPdfProcessor'
 import { toast } from 'sonner'
 
 function App() {
@@ -24,13 +24,17 @@ function App() {
   const [geojson, setGeojson] = useState<any>(null)
   const [confidence, setConfidence] = useState(0)
   const [activeTab, setActiveTab] = useState('vertices')
+  const [processingProgress, setProcessingProgress] = useState(0)
+  const [processingStatus, setProcessingStatus] = useState('')
+  const [pages, setPages] = useState<PageAnalysis[]>([])
+  const [processingTimeMs, setProcessingTimeMs] = useState(0)
 
   const steps = [
-    { id: 1, label: 'Cargar', status: 'pending' as 'pending' | 'active' | 'complete' | 'error' },
-    { id: 2, label: 'Analizar', status: 'pending' as 'pending' | 'active' | 'complete' | 'error' },
-    { id: 3, label: 'Extraer', status: 'pending' as 'pending' | 'active' | 'complete' | 'error' },
-    { id: 4, label: 'Convertir', status: 'pending' as 'pending' | 'active' | 'complete' | 'error' },
-    { id: 5, label: 'Exportar', status: 'pending' as 'pending' | 'active' | 'complete' | 'error' }
+    { id: 1, label: 'Cargar PDF', status: 'pending' as 'pending' | 'active' | 'complete' | 'error' },
+    { id: 2, label: 'Convertir a Imágenes', status: 'pending' as 'pending' | 'active' | 'complete' | 'error' },
+    { id: 3, label: 'Analizar con IA', status: 'pending' as 'pending' | 'active' | 'complete' | 'error' },
+    { id: 4, label: 'Extraer Coordenadas', status: 'pending' as 'pending' | 'active' | 'complete' | 'error' },
+    { id: 5, label: 'Generar GeoJSON', status: 'pending' as 'pending' | 'active' | 'complete' | 'error' }
   ]
 
   const [workflowSteps, setWorkflowSteps] = useState(steps)
@@ -52,49 +56,70 @@ function App() {
     setVertices([])
     setTanks([])
     setGeojson(null)
+    setPages([])
+    setProcessingProgress(0)
+    setProcessingStatus('')
     setCurrentStep(1)
     
     try {
       updateStepStatus(1, 'complete')
       updateStepStatus(2, 'active')
-      toast.info('Analizando estructura del PDF...', { duration: 2000 })
       
-      await new Promise(resolve => setTimeout(resolve, 500))
+      toast.info('Iniciando análisis lento del PDF...', { 
+        duration: 3000,
+        description: 'Este proceso tomará varios minutos'
+      })
       
-      updateStepStatus(2, 'complete')
-      updateStepStatus(3, 'active')
-      toast.info('Extrayendo tablas de coordenadas...', { duration: 2000 })
+      const result = await processSlowPDF(file, (current, total, status) => {
+        setProcessingProgress(current)
+        setProcessingStatus(status)
+        
+        if (current <= 15) {
+          setCurrentStep(2)
+          updateStepStatus(2, 'active')
+        } else if (current <= 90) {
+          setCurrentStep(3)
+          updateStepStatus(2, 'complete')
+          updateStepStatus(3, 'active')
+        } else if (current <= 95) {
+          setCurrentStep(4)
+          updateStepStatus(3, 'complete')
+          updateStepStatus(4, 'active')
+        } else {
+          setCurrentStep(5)
+          updateStepStatus(4, 'complete')
+          updateStepStatus(5, 'active')
+        }
+      })
       
-      const data = await processStructuredPDF(file)
+      setPages(result.pages)
+      setVertices(result.vertices)
+      setTanks(result.tanks)
+      setConfidence(result.overallConfidence)
+      setProcessingTimeMs(result.processingTimeMs)
       
-      setVertices(data.vertices)
-      setTanks(data.tanks)
-      setConfidence(data.overallConfidence)
+      updateStepStatus(5, 'complete')
       
-      updateStepStatus(3, 'complete')
-      updateStepStatus(4, 'active')
-      toast.info('Convirtiendo coordenadas UTM 18S → WGS84...', { duration: 1500 })
-      
-      await new Promise(resolve => setTimeout(resolve, 800))
-      
-      updateStepStatus(4, 'complete')
-      
-      if (data.vertices.length === 0 && data.tanks.length === 0) {
+      if (result.vertices.length === 0 && result.tanks.length === 0) {
         toast.warning('No se encontraron coordenadas en el PDF', {
-          description: 'Verifica que el PDF contenga tablas con coordenadas UTM'
+          description: 'El análisis con IA no pudo extraer coordenadas. Verifica el PDF.'
         })
         updateStepStatus(3, 'error')
       } else {
-        toast.success(`Extraídos ${data.vertices.length} vértices y ${data.tanks.length} estanques`)
+        toast.success(`Análisis completo en ${Math.round(result.processingTimeMs / 1000)}s`, {
+          description: `${result.vertices.length} vértices y ${result.tanks.length} estanques extraídos`
+        })
         
-        const geoJsonData = generateGeoJSONFromStructuredData(data.vertices, data.tanks, {
+        const geoJsonData = generateGeoJSONFromSlowData(result.vertices, result.tanks, {
           fuente: file.name,
           fechaExtraccion: new Date().toISOString(),
-          sistemaCoordinadas: 'UTM 18S → WGS84'
+          sistemaCoordinadas: 'UTM 18S → WGS84',
+          metodo: 'Análisis Lento con IA',
+          tiempoProcesamiento: `${Math.round(result.processingTimeMs / 1000)}s`,
+          paginasAnalizadas: result.pages.length
         })
         
         setGeojson(geoJsonData)
-        updateStepStatus(5, 'complete')
       }
     } catch (error) {
       toast.error('Error al procesar el PDF', {
@@ -109,10 +134,11 @@ function App() {
   const handleVerticesUpdate = (updatedVertices: VertexData[]) => {
     setVertices(updatedVertices)
     if (updatedVertices.length > 0 || tanks.length > 0) {
-      const geoJsonData = generateGeoJSONFromStructuredData(updatedVertices, tanks, {
+      const geoJsonData = generateGeoJSONFromSlowData(updatedVertices, tanks, {
         fuente: file?.name || 'manual',
         fechaExtraccion: new Date().toISOString(),
-        sistemaCoordinadas: 'UTM 18S → WGS84'
+        sistemaCoordinadas: 'UTM 18S → WGS84',
+        metodo: 'Análisis Lento con IA (editado)'
       })
       setGeojson(geoJsonData)
       toast.success('Vértices actualizados')
@@ -122,10 +148,11 @@ function App() {
   const handleTanksUpdate = (updatedTanks: TankData[]) => {
     setTanks(updatedTanks)
     if (vertices.length > 0 || updatedTanks.length > 0) {
-      const geoJsonData = generateGeoJSONFromStructuredData(vertices, updatedTanks, {
+      const geoJsonData = generateGeoJSONFromSlowData(vertices, updatedTanks, {
         fuente: file?.name || 'manual',
         fechaExtraccion: new Date().toISOString(),
-        sistemaCoordinadas: 'UTM 18S → WGS84'
+        sistemaCoordinadas: 'UTM 18S → WGS84',
+        metodo: 'Análisis Lento con IA (editado)'
       })
       setGeojson(geoJsonData)
       toast.success('Estanques actualizados')
@@ -157,6 +184,10 @@ function App() {
     setActiveTab('vertices')
     setCurrentStep(0)
     setWorkflowSteps(steps)
+    setPages([])
+    setProcessingProgress(0)
+    setProcessingStatus('')
+    setProcessingTimeMs(0)
     toast.info('Reiniciado')
   }
 
@@ -169,7 +200,10 @@ function App() {
               <Globe size={32} weight="duotone" className="text-primary" />
               <div>
                 <h1 className="text-3xl font-bold tracking-tight">Extractor GeoJSON</h1>
-                <p className="text-sm text-muted-foreground mt-1">Áreas de Servicio y Coordenadas Estanques</p>
+                <p className="text-sm text-muted-foreground mt-1 flex items-center gap-2">
+                  <Clock size={16} />
+                  Análisis Lento con IA - Áreas de Servicio y Coordenadas Estanques
+                </p>
               </div>
             </div>
             {geojson && (
@@ -201,9 +235,12 @@ function App() {
               )}
 
               {isProcessing && (
-                <div className="space-y-2">
-                  <Progress value={66} className="h-2" />
-                  <p className="text-sm text-muted-foreground text-center">Procesando documento...</p>
+                <div className="space-y-3">
+                  <Progress value={processingProgress} className="h-2" />
+                  <div className="text-center space-y-1">
+                    <p className="text-sm font-medium text-foreground">{processingStatus}</p>
+                    <p className="text-xs text-muted-foreground">{Math.round(processingProgress)}% completado</p>
+                  </div>
                 </div>
               )}
 
@@ -232,10 +269,19 @@ function App() {
                     <AlertDescription className="flex items-center gap-4">
                       <div>
                         <p className="font-medium">Extracción completada</p>
-                        <div className="flex items-center gap-2 mt-1">
+                        <div className="flex items-center gap-2 mt-1 flex-wrap">
                           <Badge variant="secondary">{vertices.length} vértices</Badge>
                           <Badge variant="secondary">{tanks.length} estanques</Badge>
                           <Badge variant="outline">UTM 18S</Badge>
+                          {pages.length > 0 && (
+                            <Badge variant="outline">{pages.length} páginas</Badge>
+                          )}
+                          {processingTimeMs > 0 && (
+                            <Badge variant="outline" className="gap-1">
+                              <Clock size={12} />
+                              {Math.round(processingTimeMs / 1000)}s
+                            </Badge>
+                          )}
                         </div>
                       </div>
                     </AlertDescription>
@@ -257,10 +303,11 @@ function App() {
 
           {!isProcessing && (vertices.length > 0 || tanks.length > 0) && (
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="grid w-full grid-cols-3">
+              <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="vertices">Vértices AS ({vertices.length})</TabsTrigger>
                 <TabsTrigger value="tanks">Estanques ({tanks.length})</TabsTrigger>
                 <TabsTrigger value="geojson" disabled={!geojson}>GeoJSON</TabsTrigger>
+                <TabsTrigger value="pages" disabled={pages.length === 0}>Páginas ({pages.length})</TabsTrigger>
               </TabsList>
 
               <TabsContent value="vertices" className="mt-6">
@@ -273,6 +320,34 @@ function App() {
 
               <TabsContent value="geojson" className="mt-6">
                 <GeoJSONView geojson={geojson} />
+              </TabsContent>
+
+              <TabsContent value="pages" className="mt-6">
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold">Páginas Analizadas</h3>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {pages.map(page => (
+                      <div key={page.pageNumber} className="border border-border rounded-lg p-4 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <h4 className="font-medium">Página {page.pageNumber}</h4>
+                          <Badge variant={page.confidence > 0.7 ? 'default' : 'secondary'}>
+                            {Math.round(page.confidence * 100)}% confianza
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          Tipo: <span className="font-medium">{page.pageType}</span>
+                        </p>
+                        {page.base64Image && (
+                          <img 
+                            src={page.base64Image} 
+                            alt={`Página ${page.pageNumber}`} 
+                            className="w-full h-32 object-cover rounded border border-border"
+                          />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </TabsContent>
             </Tabs>
           )}

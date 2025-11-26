@@ -1,30 +1,37 @@
 # Planning Guide
 
-A specialized web application that extracts geographic data from structured Spanish-language PDF documents containing maps and coordinate tables, converting them into GeoJSON format with support for UTM Zone 18S coordinates.
+A specialized web application that extracts geographic data from structured Spanish-language PDF documents by converting pages to images and analyzing them with AI, then converting UTM Zone 18S coordinates to GeoJSON format with enhanced accuracy.
 
 **Experience Qualities**:
-1. **Intelligent** - The app automatically identifies PDF structure (map, vertex tables, tank coordinates) and processes each section appropriately.
-2. **Precise** - Users trust the UTM-to-WGS84 conversion and table extraction accuracy, with clear validation and comparison tools.
-3. **Professional** - The interface feels purpose-built for GIS professionals working with Chilean water service area documentation.
+1. **Thorough** - The app takes a slow, methodical approach by converting PDF pages to images and analyzing each with AI, prioritizing accuracy over speed.
+2. **Intelligent** - Uses AI vision models to analyze each page independently, identifying maps, vertex tables, and tank coordinates without relying on text extraction alone.
+3. **Transparent** - Shows detailed progress through each phase (conversion, page-by-page analysis, coordinate extraction) with clear status updates and processing time.
 
 **Complexity Level**: Light Application (multiple features with basic state)
-  - The app handles specialized PDF parsing, table OCR, coordinate system conversion (UTM 18S to WGS84), and map comparison capabilities without requiring backend infrastructure.
+  - The app handles PDF-to-image conversion, AI-powered visual analysis, coordinate system conversion (UTM 18S to WGS84), and GeoJSON generation with page-level inspection capabilities.
 
 ## Essential Features
 
-### PDF Structure Analysis
-- **Functionality**: Automatically analyze uploaded PDF to identify three key sections: map image, "Vértices AS" (Area de Servicio) table, and "Coordenadas Estanques" (tank coordinates) table
-- **Purpose**: Intelligently parse structured PDFs without requiring manual section identification
+### PDF to Image Conversion
+- **Functionality**: Convert each page of the uploaded PDF into high-resolution images for visual AI analysis
+- **Purpose**: Enable AI vision models to analyze page content visually rather than relying on error-prone text extraction
 - **Trigger**: User uploads a PDF file
-- **Progression**: Upload PDF → Analyze structure → Identify sections → Display findings → Ready for table extraction
-- **Success criteria**: All three sections correctly identified with confidence scores; user can manually adjust if needed
+- **Progression**: Upload PDF → Read file → Render each page as image → Store base64 images → Display page count
+- **Success criteria**: All PDF pages successfully converted to images with preview thumbnails available
 
-### Table OCR & Extraction
-- **Functionality**: Extract coordinate data from both tables using OCR, parsing Spanish text labels and numeric coordinate values in UTM 18S format
-- **Purpose**: Convert tabular data into machine-readable format for GeoJSON generation
-- **Trigger**: Automatic after structure analysis completes
-- **Progression**: Sections identified → OCR on tables → Parse rows → Extract coordinates → Validate format → Display results
-- **Success criteria**: Tables correctly parsed with vertex names/IDs and UTM coordinates (Este/Northing) extracted
+### Slow Page-by-Page AI Analysis
+- **Functionality**: Send each page image to AI vision model with structured prompts to identify content type (map, vertices table, tanks table) and extract coordinates
+- **Purpose**: Achieve higher accuracy by visually analyzing each page independently with AI rather than text parsing
+- **Trigger**: Automatic after PDF conversion completes
+- **Progression**: Images ready → For each page: send to AI → identify page type → extract coordinates → validate format → store results → move to next page → complete
+- **Success criteria**: Each page analyzed with type classification and confidence score, all UTM coordinates extracted from visual tables
+
+### Coordinate Extraction & Validation
+- **Functionality**: Parse AI responses to extract UTM coordinates, validate they are within Zone 18S bounds, and categorize by type (vertices vs tanks)
+- **Purpose**: Ensure extracted coordinates are valid and properly categorized before conversion
+- **Trigger**: Automatic as each page analysis completes
+- **Progression**: AI returns JSON → parse coordinates → validate UTM 18S format → check Chilean geographic bounds → categorize by source page type → aggregate results
+- **Success criteria**: All valid coordinates extracted, invalid ones flagged, proper categorization between vertices and tanks
 
 ### UTM 18S to WGS84 Conversion
 - **Functionality**: Convert all extracted UTM Zone 18S coordinates to WGS84 decimal degrees for GeoJSON compatibility
@@ -40,12 +47,19 @@ A specialized web application that extracts geographic data from structured Span
 - **Progression**: Converted coordinates → Build polygon from vertices → Create points for tanks → Combine in GeoJSON → Display preview
 - **Success criteria**: Valid GeoJSON with polygon geometry for service area and point geometries for tanks
 
-### Map Comparison & Validation
-- **Functionality**: Display extracted map image alongside generated GeoJSON overlay to visually compare accuracy
-- **Purpose**: Allow users to validate that extracted coordinates match the original map
-- **Trigger**: Automatic after GeoJSON generation
-- **Progression**: GeoJSON ready → Extract map from PDF → Overlay geometries → User compares → Confirms or adjusts
-- **Success criteria**: Side-by-side or overlaid view showing map and generated features for visual verification
+### Progress Monitoring
+- **Functionality**: Display detailed real-time progress through conversion, analysis, extraction, and generation phases with percentage completion and time estimates
+- **Purpose**: Keep users informed during the slow multi-minute process, showing that analysis is progressing
+- **Trigger**: Automatic during processing
+- **Progression**: Process starts → show phase (converting/analyzing/extracting) → update percentage → show current page being analyzed → estimate time remaining → complete
+- **Success criteria**: Clear progress bar with percentage, current status message, and processing time displayed
+
+### Page Analysis Inspector
+- **Functionality**: Allow users to inspect individual analyzed pages with thumbnails, page type classification, confidence scores, and raw AI analysis results
+- **Purpose**: Provide transparency into what the AI detected on each page and enable debugging of extraction issues
+- **Trigger**: User clicks "Páginas" tab after processing completes
+- **Progression**: View pages tab → see grid of analyzed pages → click page → see full details → view page type, confidence, extracted coordinates, thumbnail
+- **Success criteria**: All analyzed pages visible with thumbnails, type labels, confidence badges, and ability to inspect raw analysis data
 
 ### Data Export
 - **Functionality**: Download the generated GeoJSON file with Spanish property names and proper structure
@@ -62,16 +76,16 @@ A specialized web application that extracts geographic data from structured Span
 - **Success criteria**: Edits persist and correctly update the generated GeoJSON with new coordinates
 
 ## Edge Case Handling
-- **Estructura No Detectada**: Display warning if expected sections (map/tables) not found, allow manual section marking
-- **Errores de OCR**: Highlight low-confidence table cells, allow manual correction
-- **Coordenadas Fuera de Rango**: Validate UTM coordinates are within Zone 18S bounds, flag outliers
-- **Tablas Incompletas**: Show which vertices/tanks are missing coordinates, offer to skip or manually add
-- **Sistemas de Coordenadas Mixtos**: Detect if some coordinates appear to be in different format, warn user
-- **PDFs de Baja Calidad**: Show OCR confidence scores, suggest manual review of all extracted values
-- **Polígonos No Cerrados**: Auto-close polygon if first and last vertices don't match, notify user
+- **Página Sin Coordenadas**: If AI cannot find coordinates on a page, log it but continue processing other pages
+- **PDF Muy Grande**: Limit analysis to first 10 pages to prevent excessive processing time
+- **Conversión a Imagen Falla**: Show clear error if browser cannot render PDF pages, suggest alternative approach
+- **Respuesta IA Inválida**: If AI returns malformed JSON, log error but continue with other pages
+- **Coordenadas Duplicadas**: De-duplicate coordinates found across multiple pages
+- **Confianza Baja en Múltiples Páginas**: Warn user if average confidence across all pages is below threshold
+- **Timeout de IA**: Set reasonable timeout for each AI call, skip page if it takes too long
 
 ## Design Direction
-The design should feel technical and purpose-built for GIS professionals working with Chilean water service documentation. It should evoke precision and trust while guiding users through a complex multi-step extraction process. A structured, workflow-oriented interface with clear progress indicators serves the data transformation purpose.
+The design should feel methodical and trustworthy for GIS professionals working with Chilean water service documentation. It should emphasize the thoroughness of the slow analysis approach while keeping users engaged through detailed progress feedback. A calm, process-oriented interface with clear phase indicators serves the multi-minute processing workflow.
 
 ## Color Selection
 Analogous (adjacent colors on the color wheel) - Using a blue-to-teal technical palette that evokes water, maps, and GIS applications, with orange accents for validation and comparison states.
@@ -99,60 +113,59 @@ The typography should convey technical precision and data accuracy, using Inter 
   - Code (Coordinates & Tables): JetBrains Mono Regular / 13px / monospace for coordinate and table data display
 
 ## Animations
-Animations should emphasize workflow progression and data transformation, with clear step-by-step feedback that builds confidence in the extraction process.
+Animations should emphasize the slow, thorough nature of the analysis with clear progress through each phase, building confidence that the AI is carefully examining each page.
 
-- **Purposeful Meaning**: Structure analysis shows scanning animation; table extraction animates row-by-row parsing; coordinate conversion shows transformation feedback; map overlay fades in to show comparison
-- **Hierarchy of Movement**: File upload gets immediate response; analysis phase shows clear progress through sections; OCR processing animates per table; coordinate conversion shows batch transformation; final GeoJSON generation provides satisfying completion
+- **Purposeful Meaning**: PDF conversion shows page-by-page rendering; AI analysis displays current page number and type being detected; coordinate extraction shows validation checks; progress bar smoothly advances through phases
+- **Hierarchy of Movement**: File upload gets immediate response; conversion phase shows page count increasing; analysis phase emphasizes per-page examination with page thumbnails appearing; extraction shows coordinate validation; final GeoJSON generation provides satisfying completion with processing time display
 
 ## Component Selection
 - **Components**:
   - Upload zone: Custom component with drag-and-drop, PDF icon preview
-  - Workflow stepper: Custom component showing 5 steps (Upload → Analysis → Extraction → Conversion → Export)
-  - Structure analyzer: Card components showing detected sections with confidence badges
-  - Table viewer: Custom table component with editable cells, coordinate validation
-  - Coordinate converter: Progress indicator showing UTM→WGS84 conversion
-  - Map comparison: Split-pane view with original map and GeoJSON overlay using Canvas
+  - Workflow stepper: Custom component showing 5 steps (Cargar PDF → Convertir a Imágenes → Analizar con IA → Extraer Coordenadas → Generar GeoJSON)
+  - Progress tracker: Progress bar with percentage, current status message, and elapsed time
+  - Page analyzer grid: Grid showing analyzed page thumbnails with type badges and confidence scores
+  - Coordinate viewer: Table components showing extracted vertices and tanks with edit capability
+  - Map visualizer: Canvas or map component showing polygon and points from extracted data
   - Action buttons: Button with Primary variant for main actions, Secondary for adjustments
-  - Validation alerts: Alert component for warnings about coordinates or OCR confidence
-  - Tabs: Tabs for switching between "Vértices AS", "Estanques", "GeoJSON", and "Comparación"
+  - Validation alerts: Alert component for warnings about low confidence or processing issues
+  - Tabs: Tabs for switching between "Vértices AS", "Estanques", "GeoJSON", and "Páginas"
   
 - **Customizations**:
-  - Custom workflow progress indicator showing 5 extraction steps
-  - Editable table cells with inline validation for coordinate formats
-  - UTM coordinate formatter showing zone (18S) and values
-  - Canvas-based map overlay showing original PDF map with generated geometries
-  - Bilingual labels (Spanish primary, with technical terms)
-  - Confidence score badges for OCR results
+  - Real-time progress indicator with phase name, percentage, and estimated time
+  - Page analysis inspector showing per-page results with thumbnails
+  - Slow processing feedback with "analyzing page X of Y" status
+  - Processing time display showing total seconds elapsed
+  - Confidence score badges with color coding (green >70%, yellow 50-70%, red <50%)
+  - Page type badges for map/vertices_table/tanks_table/mixed/unknown
   
 - **States**:
-  - Workflow steps: Pending (gray), Active (blue), Complete (green with checkmark), Error (red)
-  - Table cells: Default, Editing, Valid (green border), Invalid (red border), Low confidence (yellow highlight)
+  - Workflow steps: Pending (gray), Active (blue with pulse), Complete (green with checkmark), Error (red)
+  - Progress bar: Smooth animation through 0-100%, with phase transitions
+  - Page thumbnails: Loading skeleton, Analyzed (with badge), Selected (highlighted border)
   - Buttons: Default, hover, active, disabled, processing (with spinner)
-  - Map comparison: Aligned mode, side-by-side mode, opacity slider for overlay
   
 - **Icon Selection**:
   - UploadSimple: File upload
-  - MagnifyingGlass: Structure analysis
-  - Table: Table extraction
-  - ArrowsClockwise: Coordinate conversion
+  - Images: PDF to image conversion
+  - Eye: AI analysis phase
+  - ListChecks: Coordinate extraction
   - DownloadSimple: Export GeoJSON
-  - PencilSimple: Edit table data
-  - MapTrifold: Map comparison view
+  - Clock: Processing time indicator
   - CheckCircle: Validation success
-  - WarningCircle: Validation warnings
+  - WarningCircle: Low confidence warnings
   - Globe: GeoJSON preview
   
 - **Spacing**:
   - Workflow container: p-6
   - Section cards: p-5
-  - Table padding: p-4
-  - Step indicators: gap-3
+  - Progress area: p-4
+  - Page grid: gap-4
   - Button padding: px-5 py-2.5
   - Stack spacing: space-y-5
   
 - **Mobile**:
   - Vertical workflow stepper instead of horizontal
-  - Full-width tables with horizontal scroll
-  - Stacked map comparison (top: original, bottom: generated)
-  - Collapsible sections using Accordion for each extraction phase
-  - 48px minimum touch targets for table cell editing
+  - Full-width progress bar with abbreviated status text
+  - Single-column page grid
+  - Collapsible page analysis details using Accordion
+  - 48px minimum touch targets for all interactive elements
