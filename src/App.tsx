@@ -11,8 +11,8 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
 import { Globe, Warning, Check, DownloadSimple, Clock } from '@phosphor-icons/react'
-import { processSlowPDF, generateGeoJSONFromSlowData } from '@/lib/slowPdfProcessor'
-import type { VertexData, TankData, PageAnalysis } from '@/lib/slowPdfProcessor'
+import { processWithOCR, generateGeoJSONFromData } from '@/lib/ocrPdfProcessor'
+import type { VertexData, TankData, PageAnalysis } from '@/lib/ocrPdfProcessor'
 import { toast } from 'sonner'
 
 function App() {
@@ -31,9 +31,9 @@ function App() {
 
   const steps = [
     { id: 1, label: 'Cargar PDF', status: 'pending' as 'pending' | 'active' | 'complete' | 'error' },
-    { id: 2, label: 'Convertir a Imágenes', status: 'pending' as 'pending' | 'active' | 'complete' | 'error' },
-    { id: 3, label: 'Analizar con IA', status: 'pending' as 'pending' | 'active' | 'complete' | 'error' },
-    { id: 4, label: 'Extraer Coordenadas', status: 'pending' as 'pending' | 'active' | 'complete' | 'error' },
+    { id: 2, label: 'Renderizar Páginas', status: 'pending' as 'pending' | 'active' | 'complete' | 'error' },
+    { id: 3, label: 'OCR (Tesseract)', status: 'pending' as 'pending' | 'active' | 'complete' | 'error' },
+    { id: 4, label: 'Analizar con IA', status: 'pending' as 'pending' | 'active' | 'complete' | 'error' },
     { id: 5, label: 'Generar GeoJSON', status: 'pending' as 'pending' | 'active' | 'complete' | 'error' }
   ]
 
@@ -65,23 +65,27 @@ function App() {
       updateStepStatus(1, 'complete')
       updateStepStatus(2, 'active')
       
-      toast.info('Iniciando análisis lento del PDF...', { 
+      toast.info('Iniciando procesamiento con OCR...', { 
         duration: 3000,
-        description: 'Este proceso tomará varios minutos'
+        description: 'Renderizando PDF y extrayendo texto'
       })
       
-      const result = await processSlowPDF(file, (current, total, status) => {
+      const result = await processWithOCR(file, (current, total, status) => {
         setProcessingProgress(current)
         setProcessingStatus(status)
         
-        if (current <= 15) {
+        if (current <= 5) {
+          setCurrentStep(1)
+          updateStepStatus(1, 'active')
+        } else if (current <= 15) {
           setCurrentStep(2)
+          updateStepStatus(1, 'complete')
           updateStepStatus(2, 'active')
-        } else if (current <= 90) {
+        } else if (current <= 60) {
           setCurrentStep(3)
           updateStepStatus(2, 'complete')
           updateStepStatus(3, 'active')
-        } else if (current <= 95) {
+        } else if (current <= 90) {
           setCurrentStep(4)
           updateStepStatus(3, 'complete')
           updateStepStatus(4, 'active')
@@ -110,11 +114,11 @@ function App() {
           description: `${result.vertices.length} vértices y ${result.tanks.length} estanques extraídos`
         })
         
-        const geoJsonData = generateGeoJSONFromSlowData(result.vertices, result.tanks, {
+        const geoJsonData = generateGeoJSONFromData(result.vertices, result.tanks, {
           fuente: file.name,
           fechaExtraccion: new Date().toISOString(),
           sistemaCoordinadas: 'UTM 18S → WGS84',
-          metodo: 'Análisis Lento con IA',
+          metodo: 'OCR + Visión IA',
           tiempoProcesamiento: `${Math.round(result.processingTimeMs / 1000)}s`,
           paginasAnalizadas: result.pages.length
         })
@@ -134,11 +138,11 @@ function App() {
   const handleVerticesUpdate = (updatedVertices: VertexData[]) => {
     setVertices(updatedVertices)
     if (updatedVertices.length > 0 || tanks.length > 0) {
-      const geoJsonData = generateGeoJSONFromSlowData(updatedVertices, tanks, {
+      const geoJsonData = generateGeoJSONFromData(updatedVertices, tanks, {
         fuente: file?.name || 'manual',
         fechaExtraccion: new Date().toISOString(),
         sistemaCoordinadas: 'UTM 18S → WGS84',
-        metodo: 'Análisis Lento con IA (editado)'
+        metodo: 'OCR + Visión IA (editado)'
       })
       setGeojson(geoJsonData)
       toast.success('Vértices actualizados')
@@ -148,11 +152,11 @@ function App() {
   const handleTanksUpdate = (updatedTanks: TankData[]) => {
     setTanks(updatedTanks)
     if (vertices.length > 0 || updatedTanks.length > 0) {
-      const geoJsonData = generateGeoJSONFromSlowData(vertices, updatedTanks, {
+      const geoJsonData = generateGeoJSONFromData(vertices, updatedTanks, {
         fuente: file?.name || 'manual',
         fechaExtraccion: new Date().toISOString(),
         sistemaCoordinadas: 'UTM 18S → WGS84',
-        metodo: 'Análisis Lento con IA (editado)'
+        metodo: 'OCR + Visión IA (editado)'
       })
       setGeojson(geoJsonData)
       toast.success('Estanques actualizados')
@@ -202,7 +206,7 @@ function App() {
                 <h1 className="text-3xl font-bold tracking-tight">Extractor GeoJSON</h1>
                 <p className="text-sm text-muted-foreground mt-1 flex items-center gap-2">
                   <Clock size={16} />
-                  Análisis Lento con IA - Áreas de Servicio y Coordenadas Estanques
+                  OCR + Visión IA - Extracción de Coordenadas UTM
                 </p>
               </div>
             </div>
@@ -327,7 +331,7 @@ function App() {
                   <h3 className="text-lg font-semibold">Páginas Analizadas</h3>
                   <div className="grid gap-4 md:grid-cols-2">
                     {pages.map(page => (
-                      <div key={page.pageNumber} className="border border-border rounded-lg p-4 space-y-2">
+                      <div key={page.pageNumber} className="border border-border rounded-lg p-4 space-y-3">
                         <div className="flex items-center justify-between">
                           <h4 className="font-medium">Página {page.pageNumber}</h4>
                           <Badge variant={page.confidence > 0.7 ? 'default' : 'secondary'}>
@@ -344,6 +348,17 @@ function App() {
                             className="w-full h-32 object-cover rounded border border-border"
                           />
                         )}
+                        {page.ocrText && (
+                          <details className="text-xs">
+                            <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+                              Ver texto OCR ({page.ocrText.length} chars)
+                            </summary>
+                            <pre className="mt-2 p-2 bg-muted rounded text-xs overflow-auto max-h-32">
+                              {page.ocrText.substring(0, 500)}
+                              {page.ocrText.length > 500 && '...'}
+                            </pre>
+                          </details>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -357,7 +372,7 @@ function App() {
       <footer className="border-t border-border mt-16 py-6">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <p className="text-sm text-muted-foreground text-center">
-            Extracción automática de coordenadas UTM 18S desde PDFs estructurados
+            Extracción automática con OCR (Tesseract.js) + Visión IA de coordenadas UTM 18S
           </p>
         </div>
       </footer>

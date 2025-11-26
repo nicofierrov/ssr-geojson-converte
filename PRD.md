@@ -1,51 +1,65 @@
 # Planning Guide
 
-A specialized web application that extracts geographic data from structured Spanish-language PDF documents by converting pages to images and analyzing them with AI, then converting UTM Zone 18S coordinates to GeoJSON format with enhanced accuracy.
+A specialized web application that extracts geographic data from structured Spanish-language PDF documents using professional PDF rendering (pdfjs-dist), real OCR (Tesseract.js), and AI vision analysis (GPT-4o Vision), then converting UTM Zone 18S coordinates to GeoJSON format with high accuracy.
 
 **Experience Qualities**:
-1. **Thorough** - The app takes a slow, methodical approach by converting PDF pages to images and analyzing each with AI, prioritizing accuracy over speed.
-2. **Intelligent** - Uses AI vision models to analyze each page independently, identifying maps, vertex tables, and tank coordinates without relying on text extraction alone.
-3. **Transparent** - Shows detailed progress through each phase (conversion, page-by-page analysis, coordinate extraction) with clear status updates and processing time.
+1. **Thorough** - The app uses a multi-layered approach: professional PDF rendering, real OCR text extraction, regex pattern matching, and AI visual analysis for maximum accuracy.
+2. **Intelligent** - Combines traditional OCR with modern AI vision to cross-validate coordinates, correct OCR errors, and identify content types automatically.
+3. **Transparent** - Shows detailed progress through each phase (PDF loading, page rendering, OCR processing, AI analysis) with page-level inspection of OCR text and extracted coordinates.
 
 **Complexity Level**: Light Application (multiple features with basic state)
-  - The app handles PDF-to-image conversion, AI-powered visual analysis, coordinate system conversion (UTM 18S to WGS84), and GeoJSON generation with page-level inspection capabilities.
+  - The app handles professional PDF rendering via pdfjs-dist, OCR via Tesseract.js, AI-powered visual validation, coordinate system conversion (UTM 18S to WGS84), and GeoJSON generation with comprehensive page-level debugging capabilities.
 
 ## Essential Features
 
-### PDF to Image Conversion
-- **Functionality**: Convert each page of the uploaded PDF into high-resolution images for visual AI analysis
-- **Purpose**: Enable AI vision models to analyze page content visually rather than relying on error-prone text extraction
+### Professional PDF Rendering
+- **Functionality**: Use pdfjs-dist library to render each page of the PDF as high-quality canvas images (2.5x scale)
+- **Purpose**: Create crisp, accurate images for both OCR and AI vision analysis, ensuring text is readable
 - **Trigger**: User uploads a PDF file
-- **Progression**: Upload PDF → Read file → Render each page as image → Store base64 images → Display page count
-- **Success criteria**: All PDF pages successfully converted to images with preview thumbnails available
+- **Progression**: Upload PDF → Load with pdfjs-dist → Get page count → For each page: render to canvas at 2.5x scale → Convert to PNG base64 → Store image
+- **Success criteria**: All PDF pages successfully rendered as high-resolution images with clear text visibility
 
-### Slow Page-by-Page AI Analysis
-- **Functionality**: Send each page image to AI vision model with structured prompts to identify content type (map, vertices table, tanks table) and extract coordinates
-- **Purpose**: Achieve higher accuracy by visually analyzing each page independently with AI rather than text parsing
-- **Trigger**: Automatic after PDF conversion completes
-- **Progression**: Images ready → For each page: send to AI → identify page type → extract coordinates → validate format → store results → move to next page → complete
-- **Success criteria**: Each page analyzed with type classification and confidence score, all UTM coordinates extracted from visual tables
+### OCR Text Extraction (Tesseract.js)
+- **Functionality**: Run Tesseract.js OCR engine (Spanish language) on each rendered page to extract all text content
+- **Purpose**: Extract text that can be searched with regex patterns for coordinate formats, providing a fast first-pass extraction
+- **Trigger**: Automatic after each page is rendered
+- **Progression**: Page image ready → Initialize Tesseract worker (Spanish) → Process image → Extract text → Store OCR result → Show in debug view
+- **Success criteria**: Text successfully extracted from each page with Spanish language support, visible in page inspection tab
 
-### Coordinate Extraction & Validation
-- **Functionality**: Parse AI responses to extract UTM coordinates, validate they are within Zone 18S bounds, and categorize by type (vertices vs tanks)
-- **Purpose**: Ensure extracted coordinates are valid and properly categorized before conversion
-- **Trigger**: Automatic as each page analysis completes
-- **Progression**: AI returns JSON → parse coordinates → validate UTM 18S format → check Chilean geographic bounds → categorize by source page type → aggregate results
-- **Success criteria**: All valid coordinates extracted, invalid ones flagged, proper categorization between vertices and tanks
+### Multi-Method Coordinate Extraction
+- **Functionality**: Use multiple extraction methods in parallel: (1) Regex patterns on OCR text, (2) AI vision analysis of page image + OCR text
+- **Purpose**: Maximize coordinate extraction accuracy by combining traditional pattern matching with intelligent visual analysis
+- **Trigger**: Automatic after OCR completes for each page
+- **Progression**: OCR text ready → Run regex patterns for UTM coordinates → Send image + OCR to AI Vision → AI identifies page type and extracts coordinates → Merge results → Deduplicate → Validate UTM 18S range
+- **Success criteria**: Coordinates found by either method, duplicates removed, all within valid UTM 18S bounds (E: 600k-800k, N: 5.2M-5.8M)
+
+### AI Vision Page Analysis
+- **Functionality**: Send each page image along with OCR text to GPT-4o Vision to identify content type, validate/correct OCR coordinates, and extract visual coordinates
+- **Purpose**: Use AI to intelligently classify pages (vertices table, tanks table, map) and correct common OCR errors (O→0)
+- **Trigger**: Automatic after OCR extraction
+- **Progression**: OCR + image ready → Construct prompt with context → Send to GPT-4o Vision → Parse JSON response → Extract page type, confidence, coordinates → Validate and store
+- **Success criteria**: Each page classified with type and confidence score, coordinates extracted with error correction applied
+
+### Coordinate Validation & Deduplication
+- **Functionality**: Validate all extracted coordinates are within UTM 18S bounds for Chile, remove duplicates within 2-meter tolerance
+- **Purpose**: Ensure data quality by filtering invalid coordinates and preventing duplicate entries from multiple extraction methods
+- **Trigger**: Automatic after each page's multi-method extraction
+- **Progression**: Raw coordinates collected → Check UTM 18S range → Check Chilean bounds → Compare with existing (±2m tolerance) → Add unique coordinates
+- **Success criteria**: Only valid, unique coordinates retained; duplicates merged intelligently
 
 ### UTM 18S to WGS84 Conversion
-- **Functionality**: Convert all extracted UTM Zone 18S coordinates to WGS84 decimal degrees for GeoJSON compatibility
+- **Functionality**: Convert all validated UTM Zone 18S coordinates to WGS84 decimal degrees for GeoJSON compatibility
 - **Purpose**: Transform local coordinate system to globally-recognized standard
-- **Trigger**: Automatic after table extraction
-- **Progression**: UTM coordinates extracted → Apply zone 18S conversion → Calculate lat/lon → Validate bounds → Ready for GeoJSON
-- **Success criteria**: All coordinates successfully converted with Chilean geographic bounds validation
+- **Trigger**: Automatic after all pages processed and coordinates validated
+- **Progression**: UTM coordinates validated → Apply EPSG:32718 to WGS84 conversion → Calculate lat/lon → Validate Chilean bounds → Store both formats
+- **Success criteria**: All coordinates successfully converted with both UTM and WGS84 values available
 
 ### GeoJSON Generation
-- **Functionality**: Create GeoJSON with separate feature collections for "Área de Servicio" (polygon from vertices) and "Estanques" (point features)
-- **Purpose**: Generate properly structured geographic data with Spanish property names
-- **Trigger**: Automatic after coordinate conversion, or manual trigger after editing
-- **Progression**: Converted coordinates → Build polygon from vertices → Create points for tanks → Combine in GeoJSON → Display preview
-- **Success criteria**: Valid GeoJSON with polygon geometry for service area and point geometries for tanks
+- **Functionality**: Create standards-compliant GeoJSON FeatureCollection with polygon for service area (vertices) and points for tanks
+- **Purpose**: Generate properly structured geographic data compatible with all GIS tools
+- **Trigger**: Automatic after coordinate conversion, or manual trigger after user edits coordinates
+- **Progression**: Converted coordinates → Build closed polygon from vertices → Create point features for tanks → Add metadata properties → Combine in FeatureCollection → Display preview
+- **Success criteria**: Valid GeoJSON with proper geometry types, Spanish property names, and comprehensive metadata
 
 ### Progress Monitoring
 - **Functionality**: Display detailed real-time progress through conversion, analysis, extraction, and generation phases with percentage completion and time estimates
