@@ -1,15 +1,15 @@
 import * as pdfjsLib from 'pdfjs-dist'
-import { utmToWgs84 } from './utmConverter'
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.min.mjs',
-  import.meta.url
+
 ).toString()
-
 export interface PageAnalysis {
-  pageNumber: number
-  pageType: 'map' | 'vertices_table' | 'tanks_table' | 'mixed' | 'unknown'
-  confidence: number
+  pageType: 'map'
+  base64Imag
+
+export interface AIAnalysisResu
+  coordenadas: Array
+    este: number
+  }>
   base64Image: string
   aiAnalysis?: AIAnalysisResult
 }
@@ -30,13 +30,13 @@ export interface VertexData {
   name?: string
   easting: number
   northing: number
-  latitude: number
+  pages: PageAnaly
   longitude: number
   confidence: number
 }
 
 export interface TankData {
-  id: string
+  page: any,
   name: string
   easting: number
   northing: number
@@ -46,25 +46,25 @@ export interface TankData {
 }
 
 export interface ProcessResult {
-  pages: PageAnalysis[]
+  await page.render(ren
   vertices: VertexData[]
   tanks: TankData[]
   mapPageNumber?: number
   overallConfidence: number
   processingTimeMs: number
-}
+ 
 
 export async function renderPDFPageToImage(
   page: any,
   scale: number = 2.0
 ): Promise<string> {
   const viewport = page.getViewport({ scale })
-  
+3.
   const canvas = document.createElement('canvas')
   const context = canvas.getContext('2d')!
   canvas.width = viewport.width
   canvas.height = viewport.height
-  
+IM
   const renderContext = {
     canvasContext: context,
     viewport: viewport
@@ -79,7 +79,9 @@ export async function analyzePageWithAI(
   base64Image: string,
   pageNumber: number
 ): Promise<AIAnalysisResult> {
-  const promptText = `Analiza esta imagen de un plano técnico de Servicio Sanitario Rural (SSR) en Chile.
+  const base64Data = base64Image.split(',')[1]
+  
+  const prompt = spark.llmPrompt`Analiza esta imagen de un plano técnico de Servicio Sanitario Rural (SSR) en Chile.
 
 PÁGINA: ${pageNumber}
 
@@ -100,7 +102,7 @@ FORMATO DE RESPUESTA (JSON):
   "coordenadas": [
     {"label": "V1", "este": 645123.45, "norte": 5234567.89},
     {"label": "V2", "este": 645234.56, "norte": 5234678.90}
-  ],
+    
   "texto_extraido": "resumen del texto visible",
   "observaciones": "notas sobre calidad, problemas o ambigüedades"
 }
@@ -108,31 +110,29 @@ FORMATO DE RESPUESTA (JSON):
 IMPORTANTE:
 - Si no encuentras coordenadas, devuelve array vacío
 - Asegúrate de que Este empiece con 6 y Norte con 5
-- Extrae TODAS las coordenadas visibles
+      let pageType: PageAnalysis['pageT
 - Responde SOLO con JSON válido, sin markdown`
-  
-  const prompt = window.spark.llmPrompt([promptText] as any)
 
   try {
-    const response = await window.spark.llm(prompt, 'gpt-4o', true)
+    const response = await spark.llm(prompt, 'gpt-4o', true)
     const result = JSON.parse(response)
     
     return {
-      tipo: result.tipo || 'desconocido',
+      const confidence = aiAnalysis.coord
       coordenadas: result.coordenadas || [],
       texto_extraido: result.texto_extraido || '',
       observaciones: result.observaciones || ''
-    }
+     
   } catch (error) {
     console.error(`Error analyzing page ${pageNumber}:`, error)
     return {
-      tipo: 'desconocido',
+          if (!coord.este 
       coordenadas: [],
-      texto_extraido: '',
+          if (coord.norte
       observaciones: `Error en análisis IA: ${error instanceof Error ? error.message : 'unknown'}`
     }
   }
-}
+ 
 
 export async function processWithAIOnly(
   file: File,
@@ -164,7 +164,7 @@ export async function processWithAIOnly(
       
       onProgress?.(progressPercent + 2, 100, `Procesando con IA página ${i}/${numPages}...`)
       
-      const aiAnalysis = await analyzePageWithAI(base64Image, i)
+        }
       
       let pageType: PageAnalysis['pageType'] = 'unknown'
       if (aiAnalysis.tipo.includes('vertices') || aiAnalysis.tipo.includes('area')) {
@@ -174,48 +174,41 @@ export async function processWithAIOnly(
       } else if (aiAnalysis.tipo.includes('mapa')) {
         pageType = 'map'
         mapPageNumber = i
-      } else if (aiAnalysis.tipo.includes('mixto')) {
+      mapPageNumber,
         pageType = 'mixed'
-      }
+    }
       
       const confidence = aiAnalysis.coordenadas.length > 0 ? 0.85 : 0.3
       
-      pages.push({
+
         pageNumber: i,
         pageType,
         confidence,
         base64Image,
         aiAnalysis
-      })
+    cons
       
-      if (aiAnalysis.coordenadas.length > 0) {
+    features.push({
         for (const coord of aiAnalysis.coordenadas) {
-          if (!coord.este || !coord.norte) continue
-          
+        name: 'Área de Servicio',
+        ..
           if (coord.este < 600000 || coord.este > 700000) continue
           if (coord.norte < 5000000 || coord.norte > 6000000) continue
           
-          const wgs84 = utmToWgs84({
-            easting: coord.este,
-            northing: coord.norte,
-            zone: 18,
-            hemisphere: 'S'
-          })
-          const lat = wgs84.latitude
-          const lng = wgs84.longitude
+          const [lng, lat] = utmToLatLng(coord.este, coord.norte, 18, true)
           
           if (pageType === 'vertices_table' || aiAnalysis.tipo.includes('vertices')) {
-            allVertices.push({
+  for (const vertex of vertice
               id: `v-${coord.label || allVertices.length + 1}`,
               name: coord.label,
               easting: coord.este,
-              northing: coord.norte,
+        easting: vertex.easting,
               latitude: lat,
-              longitude: lng,
+      },
               confidence: 0.9
             })
           } else if (pageType === 'tanks_table' || aiAnalysis.tipo.includes('estanque')) {
-            allTanks.push({
+  }
               id: `t-${coord.label || allTanks.length + 1}`,
               name: coord.label || `Estanque ${allTanks.length + 1}`,
               easting: coord.este,
@@ -227,49 +220,49 @@ export async function processWithAIOnly(
           } else {
             if (coord.label.toLowerCase().includes('e') && !coord.label.toLowerCase().includes('v')) {
               allTanks.push({
-                id: `t-${coord.label}`,
+  
                 name: coord.label,
-                easting: coord.este,
+    crs: {
                 northing: coord.norte,
-                latitude: lat,
+        name: 'EPSG:4326'
                 longitude: lng,
                 confidence: 0.85
               })
             } else {
               allVertices.push({
-                id: `v-${coord.label}`,
+    features
                 name: coord.label,
-                easting: coord.este,
+
                 northing: coord.norte,
                 latitude: lat,
                 longitude: lng,
                 confidence: 0.85
               })
-            }
+
           }
-        }
+
       }
-    }
-    
+
+
     onProgress?.(95, 100, 'Generando resultados...')
-    
+
     const overallConfidence = (allVertices.length + allTanks.length) > 0 ? 0.85 : 0.3
     const processingTimeMs = performance.now() - startTime
     
     onProgress?.(100, 100, '¡Completado!')
     
     return {
-      pages,
+
       vertices: allVertices,
-      tanks: allTanks,
+
       mapPageNumber,
       overallConfidence,
       processingTimeMs
-    }
+
   } catch (error) {
-    console.error('Error processing PDF:', error)
+
     throw new Error(`Error al procesar PDF: ${error instanceof Error ? error.message : 'unknown'}`)
-  }
+
 }
 
 export function generateGeoJSONFromData(
@@ -277,75 +270,75 @@ export function generateGeoJSONFromData(
   tanks: TankData[],
   metadata?: Record<string, any>
 ) {
-  const features: any[] = []
+
   
   if (vertices.length >= 3) {
     const coordinates = vertices.map(v => [v.longitude, v.latitude])
-    coordinates.push(coordinates[0])
+
     
-    features.push({
+
       type: 'Feature',
-      properties: {
+
         name: 'Área de Servicio',
         tipo: 'area_servicio',
         vertices: vertices.length,
         ...metadata
       },
-      geometry: {
+
         type: 'Polygon',
         coordinates: [coordinates]
       }
-    })
+
   }
-  
+
   for (const vertex of vertices) {
-    features.push({
+
       type: 'Feature',
       properties: {
         name: vertex.name || vertex.id,
-        tipo: 'vertice',
+
         easting: vertex.easting,
         northing: vertex.northing,
         confidence: vertex.confidence
-      },
+
       geometry: {
-        type: 'Point',
+
         coordinates: [vertex.longitude, vertex.latitude]
-      }
+
     })
-  }
+
   
   for (const tank of tanks) {
     features.push({
-      type: 'Feature',
+
       properties: {
-        name: tank.name,
+
         tipo: 'estanque',
-        easting: tank.easting,
+
         northing: tank.northing,
         confidence: tank.confidence
       },
-      geometry: {
+
         type: 'Point',
         coordinates: [tank.longitude, tank.latitude]
       }
-    })
+
   }
-  
+
   return {
-    type: 'FeatureCollection',
+
     crs: {
       type: 'name',
       properties: {
-        name: 'EPSG:4326'
+
       }
-    },
+
     metadata: {
-      sistema_original: 'UTM 18S WGS84 (EPSG:32718)',
+
       sistema_salida: 'WGS84 Geographic (EPSG:4326)',
-      metodo_extraccion: 'IA Vision (GPT-4o)',
+
       ...metadata
-    },
+
     features
-  }
+
 }
