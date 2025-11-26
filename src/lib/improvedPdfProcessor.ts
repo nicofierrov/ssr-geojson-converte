@@ -147,9 +147,9 @@ export async function analyzePageWithAI(
   const textSnippet = pdfText.substring(0, 3000)
   
   try {
-    const promptText = `Analiza esta imagen de una página PDF de documentación de un Servicio Sanitario Rural (SSR) de Chiloé, Chile.
+    const promptText = `Analiza el texto extraído de una página PDF de documentación de un Servicio Sanitario Rural (SSR) de Chiloé, Chile.
 
-TEXTO EXTRAÍDO DEL PDF:
+TEXTO EXTRAÍDO DEL PDF (Página ${pageNumber}):
 ${textSnippet}
 
 CONTEXTO GEOGRÁFICO:
@@ -159,19 +159,19 @@ CONTEXTO GEOGRÁFICO:
 - Formato común: E 654321.00, N 5234567.00 o 654321.00, 5234567.00
 
 INSTRUCCIONES:
-1. Identifica el tipo de contenido de esta página
-2. Extrae TODAS las coordenadas UTM que encuentres (del texto o visualmente de la imagen)
+1. Identifica el tipo de contenido de esta página basándote en el texto
+2. Extrae TODAS las coordenadas UTM que encuentres en el texto
 3. Identifica el label/nombre de cada punto (V1, V2, Estanque 1, etc.)
-4. Corrige errores comunes de OCR (letra O por número 0, letra I por número 1)
+4. Corrige errores comunes (letra O por número 0, letra I por número 1)
 
 TIPOS DE PÁGINA:
 - "vertices_table": Tabla con vértices del área de servicio (AS) o polígono
 - "tanks_table": Tabla con ubicaciones de estanques de agua
-- "map": Plano o mapa con coordenadas visuales
+- "map": Plano o mapa con coordenadas
 - "mixed": Contiene múltiples tipos de información
 - "unknown": No contiene coordenadas relevantes
 
-Responde SOLO con un objeto JSON válido (sin markdown, sin explicaciones):
+Responde SOLO con un objeto JSON válido (sin markdown, sin explicaciones adicionales):
 {
   "pageType": "vertices_table",
   "confidence": 0.9,
@@ -184,9 +184,9 @@ Responde SOLO con un objeto JSON válido (sin markdown, sin explicaciones):
 
 IMPORTANTE: 
 - Verifica que todas las coordenadas estén dentro del rango válido
-- Si no hay coordenadas, retorna array vacío
-- Si detectas errores de OCR, corrígelos en las coordenadas
-- El campo "coordinates" DEBE ser un array (puede estar vacío [])`
+- Si no hay coordenadas, retorna un array vacío: "coordinates": []
+- Si detectas errores en los números, corrígelos
+- El campo "coordinates" DEBE ser un array (puede estar vacío pero debe existir)`
 
     const response = await window.spark.llm(promptText, 'gpt-4o', true)
     const parsed = JSON.parse(response)

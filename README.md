@@ -30,7 +30,7 @@ Aplicación web para extraer coordenadas UTM de PDFs de Servicios Sanitarios Rur
 1. **Renderizado PDF** - Usa `pdfjs-dist` para renderizar cada página como imagen de alta calidad (2.5x scale)
 2. **Extracción Nativa de Texto** - Extrae texto directamente de la estructura del PDF (sin OCR si no es necesario)
 3. **Extracción por Regex** - Busca patrones de coordenadas UTM en el texto extraído
-4. **Análisis con IA** - GPT-4o Vision analiza visualmente cada página para validar y extraer coordenadas adicionales
+4. **Análisis con IA** - GPT-4o analiza el texto extraído para clasificar páginas y extraer coordenadas adicionales
 5. **Conversión Geográfica** - Transforma UTM 18S (EPSG:32718) a WGS84
 
 ### 🐛 Modo Diagnóstico

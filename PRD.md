@@ -1,6 +1,8 @@
 # Planning Guide
 
-A specialized web application that extracts geographic data from structured Spanish-language PDF documents using professional PDF rendering (pdfjs-dist), native PDF text extraction, and AI vision analysis (GPT-4o Vision), then converting UTM Zone 18S coordinates to GeoJSON format with high accuracy.
+A specialized web application that extracts geographic data from structured Spanish-language PDF documents using professional PDF rendering (pdfjs-dist), native PDF text extraction, and AI text analysis (GPT-4o), then converting UTM Zone 18S coordinates to GeoJSON format with high accuracy.
+
+**NOTA IMPORTANTE**: El sistema analiza el texto extraído del PDF con IA, no las imágenes. Funciona mejor con PDFs digitales (con texto seleccionable) en lugar de PDFs escaneados.
 
 **TESTING MODE**: The application now includes a diagnostic mode that tests PDF loading, page rendering, and text extraction without running AI analysis. This helps identify issues with specific PDF files.
 
@@ -35,11 +37,11 @@ A specialized web application that extracts geographic data from structured Span
 - **Progression**: PDF text ready → Run regex patterns for UTM coordinates → Send image + text to AI Vision → AI identifies page type and extracts coordinates → Merge results → Deduplicate → Validate UTM 18S range
 - **Success criteria**: Coordinates found by either method, duplicates removed, all within valid UTM 18S bounds (E: 600k-800k, N: 5.2M-5.8M)
 
-### AI Vision Page Analysis
-- **Functionality**: Send each page image along with native PDF text to GPT-4o Vision to identify content type, validate/correct coordinates, and extract visual coordinates
+### AI Text Analysis
+- **Functionality**: Send extracted PDF text to GPT-4o to identify content type, validate/correct coordinates, and extract additional coordinates
 - **Purpose**: Use AI to intelligently classify pages (vertices table, tanks table, map) and correct common text extraction errors
 - **Trigger**: Automatic after text extraction
-- **Progression**: Text + image ready → Construct prompt with context → Send to GPT-4o Vision → Parse JSON response → Extract page type, confidence, coordinates → Validate and store
+- **Progression**: Text ready → Construct prompt with context → Send to GPT-4o → Parse JSON response → Extract page type, confidence, coordinates → Validate and store
 - **Success criteria**: Each page classified with type and confidence score, coordinates extracted with error correction applied
 
 ### Coordinate Validation & Deduplication
