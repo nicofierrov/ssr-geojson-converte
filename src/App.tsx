@@ -10,11 +10,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
-import { Globe, Warning, Check, DownloadSimple, Clock, Bug } from '@phosphor-icons/react'
-import { processWithImprovedMethod, generateGeoJSONFromData } from '@/lib/improvedPdfProcessor'
-import type { VertexData, TankData, PageAnalysis } from '@/lib/improvedPdfProcessor'
-import { runPDFDiagnostics, formatDiagnosticReport } from '@/lib/debugPdfProcessor'
-import type { DiagnosticResult } from '@/lib/debugPdfProcessor'
+import { Globe, Warning, Check, DownloadSimple, Clock, Sparkle } from '@phosphor-icons/react'
+import { processWithAIOnly, generateGeoJSONFromData } from '@/lib/aiOnlyProcessor'
+import type { VertexData, TankData, PageAnalysis } from '@/lib/aiOnlyProcessor'
 import { toast } from 'sonner'
 
 function App() {
@@ -30,14 +28,12 @@ function App() {
   const [processingStatus, setProcessingStatus] = useState('')
   const [pages, setPages] = useState<PageAnalysis[]>([])
   const [processingTimeMs, setProcessingTimeMs] = useState(0)
-  const [diagnosticMode, setDiagnosticMode] = useState(false)
-  const [diagnosticResult, setDiagnosticResult] = useState<DiagnosticResult | null>(null)
 
   const steps = [
     { id: 1, label: 'Cargar PDF', status: 'pending' as 'pending' | 'active' | 'complete' | 'error' },
-    { id: 2, label: 'Renderizar Páginas', status: 'pending' as 'pending' | 'active' | 'complete' | 'error' },
-    { id: 3, label: 'Extraer Texto', status: 'pending' as 'pending' | 'active' | 'complete' | 'error' },
-    { id: 4, label: 'Analizar con IA', status: 'pending' as 'pending' | 'active' | 'complete' | 'error' },
+    { id: 2, label: 'Renderizar Imágenes', status: 'pending' as 'pending' | 'active' | 'complete' | 'error' },
+    { id: 3, label: 'Analizar con IA', status: 'pending' as 'pending' | 'active' | 'complete' | 'error' },
+    { id: 4, label: 'Extraer Coordenadas', status: 'pending' as 'pending' | 'active' | 'complete' | 'error' },
     { id: 5, label: 'Generar GeoJSON', status: 'pending' as 'pending' | 'active' | 'complete' | 'error' }
   ]
 
@@ -45,47 +41,10 @@ function App() {
 
   useEffect(() => {
     if (file) {
-      if (diagnosticMode) {
-        runDiagnostics(file)
-      } else {
-        processFile(file)
-      }
+      processFile(file)
     }
-  }, [file, diagnosticMode])
+  }, [file])
   
-  const runDiagnostics = async (file: File) => {
-    setIsProcessing(true)
-    setProcessingStatus('Running diagnostics...')
-    
-    try {
-      toast.info('Running PDF diagnostics...', {
-        description: 'Testing PDF loading, rendering, and text extraction'
-      })
-      
-      const result = await runPDFDiagnostics(file)
-      setDiagnosticResult(result)
-      
-      const report = formatDiagnosticReport(result)
-      console.log(report)
-      
-      if (result.success) {
-        toast.success('Diagnostics passed!', {
-          description: `PDF has ${result.pdfInfo?.numPages} pages. Check console for details.`
-        })
-      } else {
-        toast.error('Diagnostics failed', {
-          description: result.error || 'Check console for details'
-        })
-      }
-    } catch (error) {
-      toast.error('Diagnostic error', {
-        description: error instanceof Error ? error.message : 'Unknown error'
-      })
-    } finally {
-      setIsProcessing(false)
-    }
-  }
-
   const updateStepStatus = (stepId: number, status: 'pending' | 'active' | 'complete' | 'error') => {
     setWorkflowSteps(prev => prev.map(step => 
       step.id === stepId ? { ...step, status } : step
@@ -106,23 +65,23 @@ function App() {
       updateStepStatus(1, 'complete')
       updateStepStatus(2, 'active')
       
-      toast.info('Iniciando procesamiento...', { 
+      toast.info('Iniciando análisis con IA...', { 
         duration: 3000,
-        description: 'Extrayendo texto y coordenadas del PDF'
+        description: 'Procesando PDF sin OCR tradicional'
       })
       
-      const result = await processWithImprovedMethod(file, (current, total, status) => {
+      const result = await processWithAIOnly(file, (current, total, status) => {
         setProcessingProgress(current)
         setProcessingStatus(status)
         
-        if (current <= 5) {
+        if (current <= 10) {
           setCurrentStep(1)
           updateStepStatus(1, 'active')
-        } else if (current <= 15) {
+        } else if (current <= 30) {
           setCurrentStep(2)
           updateStepStatus(1, 'complete')
           updateStepStatus(2, 'active')
-        } else if (current <= 60) {
+        } else if (current <= 70) {
           setCurrentStep(3)
           updateStepStatus(2, 'complete')
           updateStepStatus(3, 'active')
@@ -152,14 +111,14 @@ function App() {
         updateStepStatus(3, 'error')
       } else {
         toast.success(`Análisis completo en ${Math.round(result.processingTimeMs / 1000)}s`, {
-          description: `${result.vertices.length} vértices y ${result.tanks.length} estanques extraídos`
+          description: `${result.vertices.length} vértices y ${result.tanks.length} estanques extraídos con IA`
         })
         
         const geoJsonData = generateGeoJSONFromData(result.vertices, result.tanks, {
           fuente: file.name,
           fechaExtraccion: new Date().toISOString(),
           sistemaCoordinadas: 'UTM 18S → WGS84',
-          metodo: 'PDF.js + IA',
+          metodo: 'IA Vision (GPT-4o)',
           tiempoProcesamiento: `${Math.round(result.processingTimeMs / 1000)}s`,
           paginasAnalizadas: result.pages.length
         })
@@ -183,7 +142,7 @@ function App() {
         fuente: file?.name || 'manual',
         fechaExtraccion: new Date().toISOString(),
         sistemaCoordinadas: 'UTM 18S → WGS84',
-        metodo: 'PDF.js + IA (editado)'
+        metodo: 'IA Vision (editado)'
       })
       setGeojson(geoJsonData)
       toast.success('Vértices actualizados')
@@ -197,7 +156,7 @@ function App() {
         fuente: file?.name || 'manual',
         fechaExtraccion: new Date().toISOString(),
         sistemaCoordinadas: 'UTM 18S → WGS84',
-        metodo: 'PDF.js + IA (editado)'
+        metodo: 'IA Vision (editado)'
       })
       setGeojson(geoJsonData)
       toast.success('Estanques actualizados')
@@ -233,7 +192,6 @@ function App() {
     setProcessingProgress(0)
     setProcessingStatus('')
     setProcessingTimeMs(0)
-    setDiagnosticResult(null)
     toast.info('Reiniciado')
   }
 
@@ -247,21 +205,12 @@ function App() {
               <div>
                 <h1 className="text-3xl font-bold tracking-tight">Extractor GeoJSON</h1>
                 <p className="text-sm text-muted-foreground mt-1 flex items-center gap-2">
-                  <Clock size={16} />
-                  PDF.js + IA - Extracción de Coordenadas UTM
+                  <Sparkle size={16} weight="fill" />
+                  IA Vision - Extracción de Coordenadas UTM
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Button
-                variant={diagnosticMode ? "default" : "outline"}
-                size="sm"
-                onClick={() => setDiagnosticMode(!diagnosticMode)}
-                className="gap-2"
-              >
-                <Bug size={16} />
-                {diagnosticMode ? 'Modo Normal' : 'Diagnóstico'}
-              </Button>
               {geojson && (
                 <Button onClick={handleDownload} size="lg" className="gap-2">
                   <DownloadSimple size={20} />
@@ -275,17 +224,7 @@ function App() {
 
       <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="space-y-6">
-          {diagnosticMode && (
-            <Alert className="border-yellow-500/50 bg-yellow-500/5">
-              <Bug className="h-4 w-4 text-yellow-600" />
-              <AlertDescription>
-                <strong>Modo Diagnóstico:</strong> El PDF se analizará para identificar problemas sin procesar coordenadas.
-                Los resultados se mostrarán en la consola del navegador.
-              </AlertDescription>
-            </Alert>
-          )}
-          
-          {!diagnosticMode && <WorkflowStepper currentStep={currentStep} steps={workflowSteps} />}
+          <WorkflowStepper currentStep={currentStep} steps={workflowSteps} />
 
           <div className="grid gap-6 lg:grid-cols-2">
             <div className="space-y-6">
@@ -311,54 +250,7 @@ function App() {
                 </div>
               )}
 
-              {diagnosticMode && diagnosticResult && !isProcessing && (
-                <Alert className={diagnosticResult.success ? "border-green-500/50 bg-green-500/5" : "border-red-500/50 bg-red-500/5"}>
-                  <Check className={`h-4 w-4 ${diagnosticResult.success ? 'text-green-600' : 'text-red-600'}`} />
-                  <AlertDescription>
-                    <div className="space-y-2">
-                      <p className="font-medium">
-                        {diagnosticResult.success ? 'Diagnóstico Exitoso' : 'Diagnóstico Falló'}
-                      </p>
-                      {diagnosticResult.pdfInfo && (
-                        <div className="text-sm space-y-1">
-                          <p>Páginas: {diagnosticResult.pdfInfo.numPages}</p>
-                          <p>Tiempo de carga: {diagnosticResult.timings.loadPdf}ms</p>
-                          <p>Tiempo de renderizado: {diagnosticResult.timings.renderPages}ms</p>
-                          <p>Tiempo de extracción: {diagnosticResult.timings.extractText}ms</p>
-                        </div>
-                      )}
-                      {diagnosticResult.error && (
-                        <p className="text-sm text-red-600 font-medium">{diagnosticResult.error}</p>
-                      )}
-                      {diagnosticResult.pages && diagnosticResult.pages.length > 0 && (
-                        <details className="text-sm">
-                          <summary className="cursor-pointer font-medium">Ver detalles de páginas</summary>
-                          <div className="mt-2 space-y-2">
-                            {diagnosticResult.pages.map(page => (
-                              <div key={page.pageNum} className="border-l-2 border-border pl-3">
-                                <p className="font-medium">Página {page.pageNum}</p>
-                                <p>Texto extraído: {page.textLength} caracteres</p>
-                                <p>Imagen renderizada: {page.imageRendered ? 'Sí' : 'No'}</p>
-                                {page.imageSize && (
-                                  <p>Tamaño: {page.imageSize.width}x{page.imageSize.height}</p>
-                                )}
-                                {page.error && <p className="text-red-600">{page.error}</p>}
-                                {page.textSample && (
-                                  <p className="text-xs text-muted-foreground mt-1">
-                                    "{page.textSample.substring(0, 80)}..."
-                                  </p>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </details>
-                      )}
-                    </div>
-                  </AlertDescription>
-                </Alert>
-              )}
-
-              {!diagnosticMode && !isProcessing && (vertices.length > 0 || tanks.length > 0) && (
+              {!isProcessing && (vertices.length > 0 || tanks.length > 0) && (
                 <>
                   {confidence < 0.6 && (
                     <Alert variant="destructive">
@@ -415,7 +307,7 @@ function App() {
             </div>
           </div>
 
-          {!diagnosticMode && !isProcessing && (vertices.length > 0 || tanks.length > 0) && (
+          {!isProcessing && (vertices.length > 0 || tanks.length > 0) && (
             <Tabs value={activeTab} onValueChange={setActiveTab}>
               <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="vertices">Vértices AS ({vertices.length})</TabsTrigger>
@@ -458,15 +350,20 @@ function App() {
                             className="w-full h-32 object-cover rounded border border-border"
                           />
                         )}
-                        {page.extractedText && (
+                        {page.aiAnalysis && (
                           <details className="text-xs">
                             <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
-                              Ver texto extraído ({page.extractedText.length} chars)
+                              Ver análisis IA ({page.aiAnalysis.coordenadas.length} coords)
                             </summary>
-                            <pre className="mt-2 p-2 bg-muted rounded text-xs overflow-auto max-h-32">
-                              {page.extractedText.substring(0, 500)}
-                              {page.extractedText.length > 500 && '...'}
-                            </pre>
+                            <div className="mt-2 p-2 bg-muted rounded text-xs space-y-2">
+                              <p><strong>Tipo:</strong> {page.aiAnalysis.tipo}</p>
+                              {page.aiAnalysis.coordenadas.length > 0 && (
+                                <p><strong>Coordenadas:</strong> {page.aiAnalysis.coordenadas.map(c => c.label).join(', ')}</p>
+                              )}
+                              {page.aiAnalysis.observaciones && (
+                                <p><strong>Obs:</strong> {page.aiAnalysis.observaciones}</p>
+                              )}
+                            </div>
                           </details>
                         )}
                       </div>
@@ -481,8 +378,9 @@ function App() {
 
       <footer className="border-t border-border mt-16 py-6">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <p className="text-sm text-muted-foreground text-center">
-            Extracción automática con PDF.js + IA de coordenadas UTM 18S
+          <p className="text-sm text-muted-foreground text-center flex items-center justify-center gap-2">
+            <Sparkle size={16} weight="fill" className="text-accent" />
+            Extracción automática con IA Vision de coordenadas UTM 18S
           </p>
         </div>
       </footer>
