@@ -146,7 +146,8 @@ export async function analyzePageWithAI(
   
   const textSnippet = pdfText.substring(0, 3000)
   
-  const promptText = `Analiza esta imagen de una página PDF de documentación de un Servicio Sanitario Rural (SSR) de Chiloé, Chile.
+  try {
+    const promptText = `Analiza esta imagen de una página PDF de documentación de un Servicio Sanitario Rural (SSR) de Chiloé, Chile.
 
 TEXTO EXTRAÍDO DEL PDF:
 ${textSnippet}
@@ -187,7 +188,6 @@ IMPORTANTE:
 - Si detectas errores de OCR, corrígelos en las coordenadas
 - El campo "coordinates" DEBE ser un array (puede estar vacío [])`
 
-  try {
     const response = await window.spark.llm(promptText, 'gpt-4o', true)
     const parsed = JSON.parse(response)
     
