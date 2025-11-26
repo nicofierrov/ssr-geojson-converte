@@ -1,137 +1,158 @@
 # Planning Guide
 
-A web application that extracts geographic data from PDF documents and converts it into GeoJSON format, enabling users to transform paper maps and documents into digital, machine-readable geographic data.
+A specialized web application that extracts geographic data from structured Spanish-language PDF documents containing maps and coordinate tables, converting them into GeoJSON format with support for UTM Zone 18S coordinates.
 
 **Experience Qualities**:
-1. **Efficient** - The process should feel streamlined and automated, minimizing manual intervention while providing clear progress feedback.
-2. **Precise** - Users should trust the accuracy of the extracted data, with clear validation and editing capabilities.
-3. **Accessible** - The interface should be straightforward enough for non-technical users while powerful enough for GIS professionals.
+1. **Intelligent** - The app automatically identifies PDF structure (map, vertex tables, tank coordinates) and processes each section appropriately.
+2. **Precise** - Users trust the UTM-to-WGS84 conversion and table extraction accuracy, with clear validation and comparison tools.
+3. **Professional** - The interface feels purpose-built for GIS professionals working with Chilean water service area documentation.
 
 **Complexity Level**: Light Application (multiple features with basic state)
-  - The app handles file uploads, OCR processing, data extraction, and preview/export capabilities, but doesn't require user accounts or complex backend infrastructure.
+  - The app handles specialized PDF parsing, table OCR, coordinate system conversion (UTM 18S to WGS84), and map comparison capabilities without requiring backend infrastructure.
 
 ## Essential Features
 
-### PDF Upload & Processing
-- **Functionality**: Accept PDF files via drag-and-drop or file picker, process them using OCR to extract text and spatial data
-- **Purpose**: Entry point for users to begin the extraction workflow
-- **Trigger**: User selects or drops a PDF file onto the upload zone
-- **Progression**: Select file → Upload → OCR processing → Text extraction complete → Display results
-- **Success criteria**: PDF successfully uploaded, text extracted, and parsed data ready for conversion
+### PDF Structure Analysis
+- **Functionality**: Automatically analyze uploaded PDF to identify three key sections: map image, "Vértices AS" (Area de Servicio) table, and "Coordenadas Estanques" (tank coordinates) table
+- **Purpose**: Intelligently parse structured PDFs without requiring manual section identification
+- **Trigger**: User uploads a PDF file
+- **Progression**: Upload PDF → Analyze structure → Identify sections → Display findings → Ready for table extraction
+- **Success criteria**: All three sections correctly identified with confidence scores; user can manually adjust if needed
+
+### Table OCR & Extraction
+- **Functionality**: Extract coordinate data from both tables using OCR, parsing Spanish text labels and numeric coordinate values in UTM 18S format
+- **Purpose**: Convert tabular data into machine-readable format for GeoJSON generation
+- **Trigger**: Automatic after structure analysis completes
+- **Progression**: Sections identified → OCR on tables → Parse rows → Extract coordinates → Validate format → Display results
+- **Success criteria**: Tables correctly parsed with vertex names/IDs and UTM coordinates (Este/Northing) extracted
+
+### UTM 18S to WGS84 Conversion
+- **Functionality**: Convert all extracted UTM Zone 18S coordinates to WGS84 decimal degrees for GeoJSON compatibility
+- **Purpose**: Transform local coordinate system to globally-recognized standard
+- **Trigger**: Automatic after table extraction
+- **Progression**: UTM coordinates extracted → Apply zone 18S conversion → Calculate lat/lon → Validate bounds → Ready for GeoJSON
+- **Success criteria**: All coordinates successfully converted with Chilean geographic bounds validation
 
 ### GeoJSON Generation
-- **Functionality**: Parse extracted text for coordinate patterns (lat/long, UTM, etc.), structure names, and generate valid GeoJSON
-- **Purpose**: Core value proposition - transform unstructured PDF data into structured geographic format
-- **Trigger**: User clicks "Generate GeoJSON" after reviewing extracted data
-- **Progression**: Click generate → Parse text for coordinates → Detect format → Structure GeoJSON → Display preview
-- **Success criteria**: Valid GeoJSON output with correctly mapped coordinates and properties
+- **Functionality**: Create GeoJSON with separate feature collections for "Área de Servicio" (polygon from vertices) and "Estanques" (point features)
+- **Purpose**: Generate properly structured geographic data with Spanish property names
+- **Trigger**: Automatic after coordinate conversion, or manual trigger after editing
+- **Progression**: Converted coordinates → Build polygon from vertices → Create points for tanks → Combine in GeoJSON → Display preview
+- **Success criteria**: Valid GeoJSON with polygon geometry for service area and point geometries for tanks
 
-### Interactive Preview
-- **Functionality**: Display extracted geographic data on an interactive map preview
-- **Purpose**: Allow users to visually validate the extracted data before export
-- **Trigger**: Automatically shown after GeoJSON generation
-- **Progression**: GeoJSON generated → Render on map → User pans/zooms → Inspects features → Confirms accuracy
-- **Success criteria**: Map displays all features correctly, clickable markers show properties
+### Map Comparison & Validation
+- **Functionality**: Display extracted map image alongside generated GeoJSON overlay to visually compare accuracy
+- **Purpose**: Allow users to validate that extracted coordinates match the original map
+- **Trigger**: Automatic after GeoJSON generation
+- **Progression**: GeoJSON ready → Extract map from PDF → Overlay geometries → User compares → Confirms or adjusts
+- **Success criteria**: Side-by-side or overlaid view showing map and generated features for visual verification
 
 ### Data Export
-- **Functionality**: Download the generated GeoJSON file
+- **Functionality**: Download the generated GeoJSON file with Spanish property names and proper structure
 - **Purpose**: Provide the final output for use in GIS applications
-- **Trigger**: User clicks "Download GeoJSON" button
+- **Trigger**: User clicks "Descargar GeoJSON" button
 - **Progression**: Click download → Format JSON → Trigger browser download → File saved
-- **Success criteria**: Valid GeoJSON file downloads with proper formatting
+- **Success criteria**: Valid GeoJSON file downloads with proper formatting and Chilean coordinate bounds
 
-### Manual Editing
-- **Functionality**: Allow users to edit extracted text or coordinate data before conversion
-- **Purpose**: Correct OCR errors or adjust misinterpreted values
-- **Trigger**: User clicks edit on extracted data sections
-- **Progression**: Click edit → Text becomes editable → User corrects → Save → Re-generate GeoJSON
-- **Success criteria**: Edits persist and correctly update the generated GeoJSON
+### Manual Table Editing
+- **Functionality**: Allow users to edit extracted table data before GeoJSON generation to correct OCR errors
+- **Purpose**: Correct misread coordinates, vertex names, or tank IDs
+- **Trigger**: User clicks edit on extracted table sections
+- **Progression**: Click edit → Table becomes editable → User corrects → Save → Re-convert coordinates → Re-generate GeoJSON
+- **Success criteria**: Edits persist and correctly update the generated GeoJSON with new coordinates
 
 ## Edge Case Handling
-- **Poor Quality PDFs**: Display warning if OCR confidence is low, suggest manual review
-- **No Coordinates Found**: Show helpful message guiding user to manually add coordinate data
-- **Invalid Coordinate Formats**: Highlight unrecognized patterns, offer format examples
-- **Large Files**: Show processing progress indicator, handle timeouts gracefully
-- **Multiple Coordinate Systems**: Auto-detect and label different coordinate formats found
-- **Empty or Text-Only PDFs**: Inform user no geographic data detected, show extracted text anyway
+- **Estructura No Detectada**: Display warning if expected sections (map/tables) not found, allow manual section marking
+- **Errores de OCR**: Highlight low-confidence table cells, allow manual correction
+- **Coordenadas Fuera de Rango**: Validate UTM coordinates are within Zone 18S bounds, flag outliers
+- **Tablas Incompletas**: Show which vertices/tanks are missing coordinates, offer to skip or manually add
+- **Sistemas de Coordenadas Mixtos**: Detect if some coordinates appear to be in different format, warn user
+- **PDFs de Baja Calidad**: Show OCR confidence scores, suggest manual review of all extracted values
+- **Polígonos No Cerrados**: Auto-close polygon if first and last vertices don't match, notify user
 
 ## Design Direction
-The design should feel professional and technical yet approachable, emphasizing clarity and workflow progression. It should evoke trust and precision while maintaining simplicity. A minimal interface serves the data-focused purpose, with clear visual hierarchy guiding users through the extraction pipeline.
+The design should feel technical and purpose-built for GIS professionals working with Chilean water service documentation. It should evoke precision and trust while guiding users through a complex multi-step extraction process. A structured, workflow-oriented interface with clear progress indicators serves the data transformation purpose.
 
 ## Color Selection
-Complementary (opposite colors) - Using a blue-green technical palette paired with warm amber accents to create a professional, map-like aesthetic that feels both trustworthy and action-oriented.
+Analogous (adjacent colors on the color wheel) - Using a blue-to-teal technical palette that evokes water, maps, and GIS applications, with orange accents for validation and comparison states.
 
-- **Primary Color**: Deep teal `oklch(0.45 0.12 200)` - Evokes maps, GIS, and geographic data; used for primary actions and key UI elements
-- **Secondary Colors**: Slate gray `oklch(0.30 0.02 240)` for backgrounds and supportive elements, suggesting technical precision
-- **Accent Color**: Warm amber `oklch(0.70 0.15 50)` for CTAs, success states, and drawing attention to generated outputs
+- **Primary Color**: Technical blue `oklch(0.50 0.15 240)` - Evokes water services, technical precision; used for primary actions and workflow steps
+- **Secondary Colors**: Deep teal `oklch(0.40 0.12 200)` for secondary elements, suggesting map layers and geographic data
+- **Accent Color**: Warm orange `oklch(0.65 0.18 45)` for comparison highlights, validation markers, and attention-grabbing CTAs
 - **Foreground/Background Pairings**:
-  - Background (White `oklch(0.98 0 0)`): Dark slate text `oklch(0.25 0.02 240)` - Ratio 12.1:1 ✓
-  - Card (Light gray `oklch(0.96 0 0)`): Dark slate text `oklch(0.25 0.02 240)` - Ratio 11.5:1 ✓
-  - Primary (Deep teal `oklch(0.45 0.12 200)`): White text `oklch(0.98 0 0)` - Ratio 7.2:1 ✓
-  - Secondary (Slate gray `oklch(0.30 0.02 240)`): White text `oklch(0.98 0 0)` - Ratio 11.8:1 ✓
-  - Accent (Warm amber `oklch(0.70 0.15 50)`): Dark slate text `oklch(0.25 0.02 240)` - Ratio 4.9:1 ✓
-  - Muted (Light slate `oklch(0.92 0.01 240)`): Medium slate text `oklch(0.50 0.02 240)` - Ratio 5.1:1 ✓
+  - Background (Light blue-gray `oklch(0.97 0.01 240)`): Dark slate text `oklch(0.20 0.03 240)` - Ratio 14.2:1 ✓
+  - Card (White `oklch(0.99 0 0)`): Dark slate text `oklch(0.20 0.03 240)` - Ratio 15.1:1 ✓
+  - Primary (Technical blue `oklch(0.50 0.15 240)`): White text `oklch(0.99 0 0)` - Ratio 8.1:1 ✓
+  - Secondary (Deep teal `oklch(0.40 0.12 200)`): White text `oklch(0.99 0 0)` - Ratio 9.8:1 ✓
+  - Accent (Warm orange `oklch(0.65 0.18 45)`): Dark slate text `oklch(0.20 0.03 240)` - Ratio 6.2:1 ✓
+  - Muted (Light gray `oklch(0.90 0.01 240)`): Medium slate text `oklch(0.45 0.02 240)` - Ratio 5.8:1 ✓
 
 ## Font Selection
-The typography should convey technical precision and modern professionalism, using Inter for its excellent readability and geometric clarity that complements data-driven interfaces.
+The typography should convey technical precision and data accuracy, using Inter for its excellent readability in tabular data and coordinate displays.
 
 - **Typographic Hierarchy**:
-  - H1 (App Title): Inter Bold / 32px / -0.02em letter spacing
-  - H2 (Section Headers): Inter SemiBold / 24px / -0.01em letter spacing
-  - H3 (Subsections): Inter Medium / 18px / normal letter spacing
-  - Body (Content): Inter Regular / 15px / normal letter spacing / 1.6 line height
-  - Small (Labels): Inter Medium / 13px / normal letter spacing
-  - Code (Coordinates): JetBrains Mono Regular / 14px / monospace for coordinate display
+  - H1 (App Title): Inter Bold / 30px / -0.02em letter spacing
+  - H2 (Workflow Steps): Inter SemiBold / 22px / -0.01em letter spacing
+  - H3 (Section Labels): Inter Medium / 16px / normal letter spacing
+  - Body (Content): Inter Regular / 14px / normal letter spacing / 1.5 line height
+  - Small (Labels): Inter Medium / 12px / normal letter spacing
+  - Code (Coordinates & Tables): JetBrains Mono Regular / 13px / monospace for coordinate and table data display
 
 ## Animations
-Animations should feel purposeful and technical, emphasizing the transformation of data from raw PDF to structured GeoJSON. Subtle transitions communicate processing states while maintaining a professional, efficient workflow.
+Animations should emphasize workflow progression and data transformation, with clear step-by-step feedback that builds confidence in the extraction process.
 
-- **Purposeful Meaning**: Loading states use smooth fade-ins and progress animations to communicate AI/OCR processing; success states have satisfying confirmations that reinforce data quality
-- **Hierarchy of Movement**: File upload gets immediate feedback; processing states show clear progress; map rendering animates to draw attention to the visual preview; export actions provide quick, confident confirmation
+- **Purposeful Meaning**: Structure analysis shows scanning animation; table extraction animates row-by-row parsing; coordinate conversion shows transformation feedback; map overlay fades in to show comparison
+- **Hierarchy of Movement**: File upload gets immediate response; analysis phase shows clear progress through sections; OCR processing animates per table; coordinate conversion shows batch transformation; final GeoJSON generation provides satisfying completion
 
 ## Component Selection
 - **Components**:
-  - Upload zone: Custom component with drag-and-drop using Tailwind border-dashed and hover states
-  - Processing indicator: Progress component with percentage and status text
-  - Data display: Card components for extracted text sections with Separator between sections
-  - Editor: Textarea for manual text editing with clear save/cancel actions
-  - Map preview: Custom component using a simple coordinate grid visualization
-  - Action buttons: Button components with Primary variant for "Generate" and "Download", Secondary for "Edit"
-  - Alerts: Alert component for warnings and errors during processing
-  - Tabs: Tabs component to switch between "Extracted Text", "GeoJSON Preview", and "Map View"
+  - Upload zone: Custom component with drag-and-drop, PDF icon preview
+  - Workflow stepper: Custom component showing 5 steps (Upload → Analysis → Extraction → Conversion → Export)
+  - Structure analyzer: Card components showing detected sections with confidence badges
+  - Table viewer: Custom table component with editable cells, coordinate validation
+  - Coordinate converter: Progress indicator showing UTM→WGS84 conversion
+  - Map comparison: Split-pane view with original map and GeoJSON overlay using Canvas
+  - Action buttons: Button with Primary variant for main actions, Secondary for adjustments
+  - Validation alerts: Alert component for warnings about coordinates or OCR confidence
+  - Tabs: Tabs for switching between "Vértices AS", "Estanques", "GeoJSON", and "Comparación"
   
 - **Customizations**:
-  - Custom file upload dropzone with animated dashed border on hover/drag
-  - Coordinate highlighting in extracted text using Badge components
-  - Custom map visualization component (simple SVG-based coordinate plot)
-  - JSON syntax highlighting for GeoJSON preview using custom styling
+  - Custom workflow progress indicator showing 5 extraction steps
+  - Editable table cells with inline validation for coordinate formats
+  - UTM coordinate formatter showing zone (18S) and values
+  - Canvas-based map overlay showing original PDF map with generated geometries
+  - Bilingual labels (Spanish primary, with technical terms)
+  - Confidence score badges for OCR results
   
 - **States**:
-  - Buttons: Default with teal background, hover with slight brightness increase, active with subtle scale-down, disabled with reduced opacity and no pointer events
-  - Upload zone: Default with dashed border, drag-over with solid border and background tint, uploading with animated border, success with green accent
-  - Text areas: Default with border, focus with ring and border color change, error with red border
+  - Workflow steps: Pending (gray), Active (blue), Complete (green with checkmark), Error (red)
+  - Table cells: Default, Editing, Valid (green border), Invalid (red border), Low confidence (yellow highlight)
+  - Buttons: Default, hover, active, disabled, processing (with spinner)
+  - Map comparison: Aligned mode, side-by-side mode, opacity slider for overlay
   
 - **Icon Selection**:
-  - UploadSimple: File upload action
-  - FileText: Representing PDF documents
-  - MapPin: Geographic/coordinate data
-  - DownloadSimple: Export action
-  - Check: Success confirmations
-  - Warning: Error states
-  - PencilSimple: Edit actions
-  - Globe: Map/GeoJSON preview
+  - UploadSimple: File upload
+  - MagnifyingGlass: Structure analysis
+  - Table: Table extraction
+  - ArrowsClockwise: Coordinate conversion
+  - DownloadSimple: Export GeoJSON
+  - PencilSimple: Edit table data
+  - MapTrifold: Map comparison view
+  - CheckCircle: Validation success
+  - WarningCircle: Validation warnings
+  - Globe: GeoJSON preview
   
 - **Spacing**:
-  - Container padding: p-8
-  - Card padding: p-6
-  - Section gaps: gap-6
-  - Button padding: px-4 py-2
-  - Input padding: p-3
-  - Stack spacing: space-y-4
+  - Workflow container: p-6
+  - Section cards: p-5
+  - Table padding: p-4
+  - Step indicators: gap-3
+  - Button padding: px-5 py-2.5
+  - Stack spacing: space-y-5
   
 - **Mobile**:
-  - Single column layout on mobile (stack upload, preview, and actions vertically)
-  - Reduce padding to p-4 for containers, p-4 for cards
-  - Full-width buttons for primary actions
-  - Collapsible sections for extracted text on mobile using Accordion
-  - Touch-friendly 44px minimum tap targets for all interactive elements
+  - Vertical workflow stepper instead of horizontal
+  - Full-width tables with horizontal scroll
+  - Stacked map comparison (top: original, bottom: generated)
+  - Collapsible sections using Accordion for each extraction phase
+  - 48px minimum touch targets for table cell editing
