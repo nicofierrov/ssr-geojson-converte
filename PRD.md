@@ -1,14 +1,14 @@
 # Planning Guide
 
-A specialized web application that extracts geographic data from structured Spanish-language PDF documents using professional PDF rendering (pdfjs-dist), real OCR (Tesseract.js), and AI vision analysis (GPT-4o Vision), then converting UTM Zone 18S coordinates to GeoJSON format with high accuracy.
+A specialized web application that extracts geographic data from structured Spanish-language PDF documents using professional PDF rendering (pdfjs-dist), native PDF text extraction, and AI vision analysis (GPT-4o Vision), then converting UTM Zone 18S coordinates to GeoJSON format with high accuracy.
 
 **Experience Qualities**:
-1. **Thorough** - The app uses a multi-layered approach: professional PDF rendering, real OCR text extraction, regex pattern matching, and AI visual analysis for maximum accuracy.
-2. **Intelligent** - Combines traditional OCR with modern AI vision to cross-validate coordinates, correct OCR errors, and identify content types automatically.
-3. **Transparent** - Shows detailed progress through each phase (PDF loading, page rendering, OCR processing, AI analysis) with page-level inspection of OCR text and extracted coordinates.
+1. **Thorough** - The app uses a multi-layered approach: professional PDF rendering, native text extraction, regex pattern matching, and AI visual analysis for maximum accuracy.
+2. **Intelligent** - Combines native PDF text extraction with modern AI vision to cross-validate coordinates, correct OCR errors, and identify content types automatically.
+3. **Transparent** - Shows detailed progress through each phase (PDF loading, page rendering, text extraction, AI analysis) with page-level inspection of extracted text and coordinates.
 
 **Complexity Level**: Light Application (multiple features with basic state)
-  - The app handles professional PDF rendering via pdfjs-dist, OCR via Tesseract.js, AI-powered visual validation, coordinate system conversion (UTM 18S to WGS84), and GeoJSON generation with comprehensive page-level debugging capabilities.
+  - The app handles professional PDF rendering via pdfjs-dist, native PDF text extraction, AI-powered visual validation, coordinate system conversion (UTM 18S to WGS84), and GeoJSON generation with comprehensive page-level debugging capabilities.
 
 ## Essential Features
 
@@ -19,25 +19,25 @@ A specialized web application that extracts geographic data from structured Span
 - **Progression**: Upload PDF → Load with pdfjs-dist → Get page count → For each page: render to canvas at 2.5x scale → Convert to PNG base64 → Store image
 - **Success criteria**: All PDF pages successfully rendered as high-resolution images with clear text visibility
 
-### OCR Text Extraction (Tesseract.js)
-- **Functionality**: Run Tesseract.js OCR engine (Spanish language) on each rendered page to extract all text content
-- **Purpose**: Extract text that can be searched with regex patterns for coordinate formats, providing a fast first-pass extraction
+### Native PDF Text Extraction
+- **Functionality**: Use pdfjs-dist's built-in getTextContent() API to extract text directly from PDF structure without OCR
+- **Purpose**: Extract text that is already digitally encoded in the PDF for fast, accurate coordinate extraction
 - **Trigger**: Automatic after each page is rendered
-- **Progression**: Page image ready → Initialize Tesseract worker (Spanish) → Process image → Extract text → Store OCR result → Show in debug view
-- **Success criteria**: Text successfully extracted from each page with Spanish language support, visible in page inspection tab
+- **Progression**: Page rendered → Get text content from PDF → Extract structured text → Parse for coordinates → Store result → Show in debug view
+- **Success criteria**: Text successfully extracted from each page using native PDF APIs, visible in page inspection tab
 
 ### Multi-Method Coordinate Extraction
-- **Functionality**: Use multiple extraction methods in parallel: (1) Regex patterns on OCR text, (2) AI vision analysis of page image + OCR text
+- **Functionality**: Use multiple extraction methods in parallel: (1) Regex patterns on native PDF text, (2) AI vision analysis of page image + PDF text
 - **Purpose**: Maximize coordinate extraction accuracy by combining traditional pattern matching with intelligent visual analysis
-- **Trigger**: Automatic after OCR completes for each page
-- **Progression**: OCR text ready → Run regex patterns for UTM coordinates → Send image + OCR to AI Vision → AI identifies page type and extracts coordinates → Merge results → Deduplicate → Validate UTM 18S range
+- **Trigger**: Automatic after text extraction completes for each page
+- **Progression**: PDF text ready → Run regex patterns for UTM coordinates → Send image + text to AI Vision → AI identifies page type and extracts coordinates → Merge results → Deduplicate → Validate UTM 18S range
 - **Success criteria**: Coordinates found by either method, duplicates removed, all within valid UTM 18S bounds (E: 600k-800k, N: 5.2M-5.8M)
 
 ### AI Vision Page Analysis
-- **Functionality**: Send each page image along with OCR text to GPT-4o Vision to identify content type, validate/correct OCR coordinates, and extract visual coordinates
-- **Purpose**: Use AI to intelligently classify pages (vertices table, tanks table, map) and correct common OCR errors (O→0)
-- **Trigger**: Automatic after OCR extraction
-- **Progression**: OCR + image ready → Construct prompt with context → Send to GPT-4o Vision → Parse JSON response → Extract page type, confidence, coordinates → Validate and store
+- **Functionality**: Send each page image along with native PDF text to GPT-4o Vision to identify content type, validate/correct coordinates, and extract visual coordinates
+- **Purpose**: Use AI to intelligently classify pages (vertices table, tanks table, map) and correct common text extraction errors
+- **Trigger**: Automatic after text extraction
+- **Progression**: Text + image ready → Construct prompt with context → Send to GPT-4o Vision → Parse JSON response → Extract page type, confidence, coordinates → Validate and store
 - **Success criteria**: Each page classified with type and confidence score, coordinates extracted with error correction applied
 
 ### Coordinate Validation & Deduplication

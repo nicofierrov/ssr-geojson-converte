@@ -11,8 +11,8 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
 import { Globe, Warning, Check, DownloadSimple, Clock } from '@phosphor-icons/react'
-import { processWithOCR, generateGeoJSONFromData } from '@/lib/ocrPdfProcessor'
-import type { VertexData, TankData, PageAnalysis } from '@/lib/ocrPdfProcessor'
+import { processWithImprovedMethod, generateGeoJSONFromData } from '@/lib/improvedPdfProcessor'
+import type { VertexData, TankData, PageAnalysis } from '@/lib/improvedPdfProcessor'
 import { toast } from 'sonner'
 
 function App() {
@@ -32,7 +32,7 @@ function App() {
   const steps = [
     { id: 1, label: 'Cargar PDF', status: 'pending' as 'pending' | 'active' | 'complete' | 'error' },
     { id: 2, label: 'Renderizar Páginas', status: 'pending' as 'pending' | 'active' | 'complete' | 'error' },
-    { id: 3, label: 'OCR (Tesseract)', status: 'pending' as 'pending' | 'active' | 'complete' | 'error' },
+    { id: 3, label: 'Extraer Texto', status: 'pending' as 'pending' | 'active' | 'complete' | 'error' },
     { id: 4, label: 'Analizar con IA', status: 'pending' as 'pending' | 'active' | 'complete' | 'error' },
     { id: 5, label: 'Generar GeoJSON', status: 'pending' as 'pending' | 'active' | 'complete' | 'error' }
   ]
@@ -65,12 +65,12 @@ function App() {
       updateStepStatus(1, 'complete')
       updateStepStatus(2, 'active')
       
-      toast.info('Iniciando procesamiento con OCR...', { 
+      toast.info('Iniciando procesamiento...', { 
         duration: 3000,
-        description: 'Renderizando PDF y extrayendo texto'
+        description: 'Extrayendo texto y coordenadas del PDF'
       })
       
-      const result = await processWithOCR(file, (current, total, status) => {
+      const result = await processWithImprovedMethod(file, (current, total, status) => {
         setProcessingProgress(current)
         setProcessingStatus(status)
         
@@ -118,7 +118,7 @@ function App() {
           fuente: file.name,
           fechaExtraccion: new Date().toISOString(),
           sistemaCoordinadas: 'UTM 18S → WGS84',
-          metodo: 'OCR + Visión IA',
+          metodo: 'PDF.js + IA',
           tiempoProcesamiento: `${Math.round(result.processingTimeMs / 1000)}s`,
           paginasAnalizadas: result.pages.length
         })
@@ -142,7 +142,7 @@ function App() {
         fuente: file?.name || 'manual',
         fechaExtraccion: new Date().toISOString(),
         sistemaCoordinadas: 'UTM 18S → WGS84',
-        metodo: 'OCR + Visión IA (editado)'
+        metodo: 'PDF.js + IA (editado)'
       })
       setGeojson(geoJsonData)
       toast.success('Vértices actualizados')
@@ -156,7 +156,7 @@ function App() {
         fuente: file?.name || 'manual',
         fechaExtraccion: new Date().toISOString(),
         sistemaCoordinadas: 'UTM 18S → WGS84',
-        metodo: 'OCR + Visión IA (editado)'
+        metodo: 'PDF.js + IA (editado)'
       })
       setGeojson(geoJsonData)
       toast.success('Estanques actualizados')
@@ -206,7 +206,7 @@ function App() {
                 <h1 className="text-3xl font-bold tracking-tight">Extractor GeoJSON</h1>
                 <p className="text-sm text-muted-foreground mt-1 flex items-center gap-2">
                   <Clock size={16} />
-                  OCR + Visión IA - Extracción de Coordenadas UTM
+                  PDF.js + IA - Extracción de Coordenadas UTM
                 </p>
               </div>
             </div>
@@ -348,14 +348,14 @@ function App() {
                             className="w-full h-32 object-cover rounded border border-border"
                           />
                         )}
-                        {page.ocrText && (
+                        {page.extractedText && (
                           <details className="text-xs">
                             <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
-                              Ver texto OCR ({page.ocrText.length} chars)
+                              Ver texto extraído ({page.extractedText.length} chars)
                             </summary>
                             <pre className="mt-2 p-2 bg-muted rounded text-xs overflow-auto max-h-32">
-                              {page.ocrText.substring(0, 500)}
-                              {page.ocrText.length > 500 && '...'}
+                              {page.extractedText.substring(0, 500)}
+                              {page.extractedText.length > 500 && '...'}
                             </pre>
                           </details>
                         )}
@@ -372,7 +372,7 @@ function App() {
       <footer className="border-t border-border mt-16 py-6">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <p className="text-sm text-muted-foreground text-center">
-            Extracción automática con OCR (Tesseract.js) + Visión IA de coordenadas UTM 18S
+            Extracción automática con PDF.js + IA de coordenadas UTM 18S
           </p>
         </div>
       </footer>
