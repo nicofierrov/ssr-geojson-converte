@@ -10,9 +10,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
-import { Globe, Warning, Check, DownloadSimple, Clock } from '@phosphor-icons/react'
+import { Globe, Warning, Check, DownloadSimple, Clock, Bug } from '@phosphor-icons/react'
 import { processWithImprovedMethod, generateGeoJSONFromData } from '@/lib/improvedPdfProcessor'
 import type { VertexData, TankData, PageAnalysis } from '@/lib/improvedPdfProcessor'
+import { runPDFDiagnostics, formatDiagnosticReport } from '@/lib/debugPdfProcessor'
+import type { DiagnosticResult } from '@/lib/debugPdfProcessor'
 import { toast } from 'sonner'
 
 function App() {
@@ -28,6 +30,8 @@ function App() {
   const [processingStatus, setProcessingStatus] = useState('')
   const [pages, setPages] = useState<PageAnalysis[]>([])
   const [processingTimeMs, setProcessingTimeMs] = useState(0)
+  const [diagnosticMode, setDiagnosticMode] = useState(false)
+  const [diagnosticResult, setDiagnosticResult] = useState<DiagnosticResult | null>(null)
 
   const steps = [
     { id: 1, label: 'Cargar PDF', status: 'pending' as 'pending' | 'active' | 'complete' | 'error' },
@@ -41,9 +45,46 @@ function App() {
 
   useEffect(() => {
     if (file) {
-      processFile(file)
+      if (diagnosticMode) {
+        runDiagnostics(file)
+      } else {
+        processFile(file)
+      }
     }
-  }, [file])
+  }, [file, diagnosticMode])
+  
+  const runDiagnostics = async (file: File) => {
+    setIsProcessing(true)
+    setProcessingStatus('Running diagnostics...')
+    
+    try {
+      toast.info('Running PDF diagnostics...', {
+        description: 'Testing PDF loading, rendering, and text extraction'
+      })
+      
+      const result = await runPDFDiagnostics(file)
+      setDiagnosticResult(result)
+      
+      const report = formatDiagnosticReport(result)
+      console.log(report)
+      
+      if (result.success) {
+        toast.success('Diagnostics passed!', {
+          description: `PDF has ${result.pdfInfo?.numPages} pages. Check console for details.`
+        })
+      } else {
+        toast.error('Diagnostics failed', {
+          description: result.error || 'Check console for details'
+        })
+      }
+    } catch (error) {
+      toast.error('Diagnostic error', {
+        description: error instanceof Error ? error.message : 'Unknown error'
+      })
+    } finally {
+      setIsProcessing(false)
+    }
+  }
 
   const updateStepStatus = (stepId: number, status: 'pending' | 'active' | 'complete' | 'error') => {
     setWorkflowSteps(prev => prev.map(step => 
@@ -210,19 +251,40 @@ function App() {
                 </p>
               </div>
             </div>
-            {geojson && (
-              <Button onClick={handleDownload} size="lg" className="gap-2">
-                <DownloadSimple size={20} />
-                Descargar GeoJSON
+            <div className="flex items-center gap-2">
+              <Button
+                variant={diagnosticMode ? "default" : "outline"}
+                size="sm"
+                onClick={() => setDiagnosticMode(!diagnosticMode)}
+                className="gap-2"
+              >
+                <Bug size={16} />
+                {diagnosticMode ? 'Modo Normal' : 'Diagnóstico'}
               </Button>
-            )}
+              {geojson && (
+                <Button onClick={handleDownload} size="lg" className="gap-2">
+                  <DownloadSimple size={20} />
+                  Descargar GeoJSON
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       </header>
 
       <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="space-y-6">
-          <WorkflowStepper currentStep={currentStep} steps={workflowSteps} />
+          {diagnosticMode && (
+            <Alert className="border-yellow-500/50 bg-yellow-500/5">
+              <Bug className="h-4 w-4 text-yellow-600" />
+              <AlertDescription>
+                <strong>Modo Diagnóstico:</strong> El PDF se analizará para identificar problemas sin procesar coordenadas.
+                Los resultados se mostrarán en la consola del navegador.
+              </AlertDescription>
+            </Alert>
+          )}
+          
+          {!diagnosticMode && <WorkflowStepper currentStep={currentStep} steps={workflowSteps} />}
 
           <div className="grid gap-6 lg:grid-cols-2">
             <div className="space-y-6">
@@ -248,6 +310,53 @@ function App() {
                 </div>
               )}
 
+              {diagnosticMode && diagnosticResult && (
+                <Alert className={diagnosticResult.success ? "border-green-500/50 bg-green-500/5" : "border-red-500/50 bg-red-500/5"}>
+                  <Check className={`h-4 w-4 ${diagnosticResult.success ? 'text-green-600' : 'text-red-600'}`} />
+                  <AlertDescription>
+                    <div className="space-y-2">
+                      <p className="font-medium">
+                        {diagnosticResult.success ? 'Diagnóstico Exitoso' : 'Diagnóstico Falló'}
+                      </p>
+                      {diagnosticResult.pdfInfo && (
+                        <div className="text-sm space-y-1">
+                          <p>Páginas: {diagnosticResult.pdfInfo.numPages}</p>
+                          <p>Tiempo de carga: {diagnosticResult.timings.loadPdf}ms</p>
+                          <p>Tiempo de renderizado: {diagnosticResult.timings.renderPages}ms</p>
+                          <p>Tiempo de extracción: {diagnosticResult.timings.extractText}ms</p>
+                        </div>
+                      )}
+                      {diagnosticResult.error && (
+                        <p className="text-sm text-red-600 font-medium">{diagnosticResult.error}</p>
+                      )}
+                      {diagnosticResult.pages && diagnosticResult.pages.length > 0 && (
+                        <details className="text-sm">
+                          <summary className="cursor-pointer font-medium">Ver detalles de páginas</summary>
+                          <div className="mt-2 space-y-2">
+                            {diagnosticResult.pages.map(page => (
+                              <div key={page.pageNum} className="border-l-2 border-border pl-3">
+                                <p className="font-medium">Página {page.pageNum}</p>
+                                <p>Texto extraído: {page.textLength} caracteres</p>
+                                <p>Imagen renderizada: {page.imageRendered ? 'Sí' : 'No'}</p>
+                                {page.imageSize && (
+                                  <p>Tamaño: {page.imageSize.width}x{page.imageSize.height}</p>
+                                )}
+                                {page.error && <p className="text-red-600">{page.error}</p>}
+                                {page.textSample && (
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    "{page.textSample.substring(0, 80)}..."
+                                  </p>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </details>
+                      )}
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              )}
+              
               {!isProcessing && (vertices.length > 0 || tanks.length > 0) && (
                 <>
                   {confidence < 0.6 && (
