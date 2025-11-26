@@ -2,6 +2,8 @@
 
 A specialized web application that extracts geographic data from structured Spanish-language PDF documents using professional PDF rendering (pdfjs-dist), native PDF text extraction, and AI vision analysis (GPT-4o Vision), then converting UTM Zone 18S coordinates to GeoJSON format with high accuracy.
 
+**TESTING MODE**: The application now includes a diagnostic mode that tests PDF loading, page rendering, and text extraction without running AI analysis. This helps identify issues with specific PDF files.
+
 **Experience Qualities**:
 1. **Thorough** - The app uses a multi-layered approach: professional PDF rendering, native text extraction, regex pattern matching, and AI visual analysis for maximum accuracy.
 2. **Intelligent** - Combines native PDF text extraction with modern AI vision to cross-validate coordinates, correct OCR errors, and identify content types automatically.

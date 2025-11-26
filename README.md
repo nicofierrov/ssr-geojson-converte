@@ -1,15 +1,43 @@
-# Extractor GeoJSON - OCR + Visión IA
+# Extractor GeoJSON - PDF.js + IA
 
-Aplicación web para extraer coordenadas UTM de PDFs de Servicios Sanitarios Rurales (SSR) de Chiloé, Chile, utilizando OCR (Tesseract.js) y análisis con IA (GPT-4o Vision).
+Aplicación web para extraer coordenadas UTM de PDFs de Servicios Sanitarios Rurales (SSR) de Chiloé, Chile, utilizando extracción de texto nativa de PDF y análisis con IA (GPT-4o Vision).
+
+## 🆕 Modo de Prueba con PDF Real
+
+**NUEVO**: Sistema de diagnóstico integrado para probar PDFs antes del procesamiento completo.
+
+👉 **[Guía Rápida de Pruebas](README-TESTING.md)**
+👉 **[Documentación Completa de Pruebas](TESTING.md)**
+
+### ¿Cómo probar con tu PDF?
+
+1. Haz clic en el botón **"Diagnóstico"** en la esquina superior derecha
+2. Carga tu PDF
+3. El sistema verificará:
+   - ✅ Que el PDF se carga correctamente
+   - ✅ Que las páginas se pueden renderizar como imágenes
+   - ✅ Que se puede extraer texto del PDF
+   - ✅ Muestra del texto extraído de cada página
+
+4. Si todo está verde ✅, tu PDF está listo para procesarse
+5. Si hay errores ❌, el diagnóstico te dirá exactamente qué falló
+
+**El modo diagnóstico NO consume créditos de IA** - úsalo libremente para verificar tus PDFs.
 
 ## Características Principales
 
 ### 🔍 Procesamiento Multi-Capa
 1. **Renderizado PDF** - Usa `pdfjs-dist` para renderizar cada página como imagen de alta calidad (2.5x scale)
-2. **OCR con Tesseract.js** - Extrae texto automáticamente en español de cada página
-3. **Extracción por Regex** - Busca patrones de coordenadas UTM en el texto OCR
+2. **Extracción Nativa de Texto** - Extrae texto directamente de la estructura del PDF (sin OCR si no es necesario)
+3. **Extracción por Regex** - Busca patrones de coordenadas UTM en el texto extraído
 4. **Análisis con IA** - GPT-4o Vision analiza visualmente cada página para validar y extraer coordenadas adicionales
 5. **Conversión Geográfica** - Transforma UTM 18S (EPSG:32718) a WGS84
+
+### 🐛 Modo Diagnóstico
+- **Prueba sin consumir créditos IA** - Verifica que tu PDF funciona antes del procesamiento completo
+- **Análisis de estructura** - Confirma que el PDF se puede cargar y renderizar
+- **Extracción de texto de prueba** - Muestra una muestra del texto de cada página
+- **Identificación de problemas** - Detecta PDFs corruptos, problemas de renderizado, o falta de texto
 
 ### 📊 Tipos de Datos Extraídos
 - **Vértices del Área de Servicio (AS)** - Coordenadas que definen el polígono del área de servicio
@@ -29,8 +57,7 @@ Aplicación web para extraer coordenadas UTM de PDFs de Servicios Sanitarios Rur
 - **Tailwind CSS v4** - Estilos
 
 ### Procesamiento de PDFs
-- **pdfjs-dist** - Renderizado de páginas PDF a canvas/imágenes
-- **Tesseract.js** - Motor OCR en el navegador (español)
+- **pdfjs-dist** - Renderizado de páginas PDF a canvas/imágenes y extracción nativa de texto
 
 ### IA y Análisis
 - **Spark LLM API** - Integración con GPT-4o Vision para análisis visual
@@ -59,9 +86,10 @@ src/
 │   ├── MapVisualization.tsx     # Mapa interactivo
 │   └── GeoJSONView.tsx          # Visualizador de GeoJSON
 ├── lib/
-│   ├── ocrPdfProcessor.ts       # ⭐ Procesador principal (OCR + IA)
-│   ├── utmConverter.ts          # Conversión UTM ↔ WGS84
-│   └── utils.ts                 # Utilidades generales
+│   ├── improvedPdfProcessor.ts    # ⭐ Procesador principal (PDF.js + IA)
+│   ├── debugPdfProcessor.ts       # 🐛 Sistema de diagnóstico de PDFs
+│   ├── utmConverter.ts            # Conversión UTM ↔ WGS84
+│   └── utils.ts                   # Utilidades generales
 ├── App.tsx                      # Componente principal
 └── index.css                    # Estilos y tema
 
@@ -77,18 +105,19 @@ src/
 - Se convierte a imagen PNG base64
 - Máximo 15 páginas procesadas
 
-### 3. OCR con Tesseract (15-60%)
-- Worker de Tesseract procesa cada imagen
-- Extrae texto en español
-- **Tiempo: ~2-4 segundos por página**
+### 3. Extracción Nativa de Texto (15-60%)
+- pdfjs-dist extrae texto usando getTextContent()
+- Texto estructurado del PDF (sin OCR necesario para PDFs digitales)
+- Búsqueda de patrones de coordenadas con regex
+- **Tiempo: instantáneo - ~100ms por página**
 
 ### 4. Análisis y Extracción (60-90%)
 Para cada página:
-- **Regex**: Busca patrones de coordenadas en texto OCR
-- **IA Vision**: GPT-4o analiza la imagen + texto OCR
+- **Regex**: Busca patrones de coordenadas en texto nativo del PDF
+- **IA Vision**: GPT-4o analiza la imagen + texto extraído
   - Identifica tipo de página (tabla de vértices, estanques, mapa)
   - Extrae coordenadas con labels
-  - Corrige errores comunes de OCR (O→0)
+  - Corrige errores comunes de extracción
 - **Merge**: Combina resultados, elimina duplicados
 
 ### 5. Conversión y Validación (90-98%)
@@ -117,8 +146,8 @@ T1 - E654321 N5234567
 
 ## API Principal
 
-### `processWithOCR(file, onProgress)`
-Función principal de procesamiento.
+### `processWithImprovedMethod(file, onProgress)`
+Función principal de procesamiento con PDF.js + IA.
 
 **Parámetros:**
 - `file: File` - Archivo PDF
@@ -136,6 +165,39 @@ Función principal de procesamiento.
 }
 ```
 
+### `runPDFDiagnostics(file)`
+Ejecuta diagnóstico de PDF sin procesar con IA.
+
+**Parámetros:**
+- `file: File` - Archivo PDF
+
+**Retorna:** `Promise<DiagnosticResult>`
+```typescript
+{
+  success: boolean
+  error?: string
+  pdfInfo?: {
+    numPages: number
+    fingerprint: string
+    encrypted: boolean
+  }
+  pages?: Array<{
+    pageNum: number
+    textLength: number
+    textSample: string
+    imageRendered: boolean
+    imageSize?: { width: number; height: number }
+    error?: string
+  }>
+  timings: {
+    loadPdf: number
+    renderPages: number
+    extractText: number
+    total: number
+  }
+}
+```
+
 ### `generateGeoJSONFromData(vertices, tanks, properties)`
 Genera archivo GeoJSON estándar.
 
@@ -148,19 +210,19 @@ Genera archivo GeoJSON estándar.
 
 ## Mejoras vs. Versión Anterior
 
-### ❌ Versión Anterior (slowPdfProcessor)
-- Renderizado rudimentario con iframe
-- Sin OCR real, solo análisis visual con IA
-- Placeholders de imágenes
-- Menor precisión en extracción de texto
+### ❌ Versión Anterior (con OCR/Tesseract)
+- OCR lento (~2-4 segundos por página)
+- Errores comunes de reconocimiento de caracteres
+- Dependencia de calidad de imagen
+- Descarga adicional de modelos de idioma
 
-### ✅ Nueva Versión (ocrPdfProcessor)
-- ✨ Renderizado profesional con pdfjs-dist
-- ✨ OCR real con Tesseract.js (motor OCR probado)
-- ✨ Doble capa: Regex + IA Vision
-- ✨ Mejor manejo de errores OCR
-- ✨ Deduplicación inteligente
-- ✨ Mayor precisión y confiabilidad
+### ✅ Nueva Versión (PDF.js nativo + IA)
+- ✨ Extracción de texto nativa del PDF (instantánea)
+- ✨ Sin errores de OCR en PDFs digitales
+- ✨ Modo diagnóstico para depuración
+- ✨ Procesamiento más rápido (~100ms vs 2-4s por página)
+- ✨ IA como complemento, no dependencia primaria
+- ✨ Mejor manejo de errores con reportes detallados
 
 ## Configuración de Desarrollo
 
@@ -179,44 +241,50 @@ npm run dev
 npm run build
 ```
 
-## Dependencias Clave Añadidas
+## Dependencias Clave
 
 ```json
 {
-  "pdfjs-dist": "^4.x",      // Renderizado PDF
-  "tesseract.js": "^5.x"      // OCR
+  "pdfjs-dist": "^5.x"      // Renderizado PDF y extracción de texto
 }
 ```
+
+Nota: NO se requiere Tesseract.js. La extracción de texto se hace nativamente desde el PDF.
 
 ## Notas de Uso
 
 ### Rendimiento
-- **OCR es intensivo**: ~2-4 segundos por página
-- Se limita a 15 páginas máximo para evitar timeouts
-- El análisis completo puede tomar 3-10 minutos dependiendo del PDF
+- **Extracción de texto es rápida**: ~100ms por página (nativa del PDF)
+- **Análisis con IA es la parte lenta**: ~2-5 segundos por página
+- Se limita a 10 páginas máximo para evitar timeouts
+- El análisis completo puede tomar 2-8 minutos dependiendo del PDF
 
-### Idioma OCR
-- Configurado para español (`'spa'`)
-- Tesseract descarga el modelo de idioma la primera vez (~1MB)
+### Modo Diagnóstico
+- **Usa el modo diagnóstico PRIMERO** antes de procesar PDFs nuevos
+- No consume créditos de IA
+- Identifica problemas antes del procesamiento completo
+- Ver TESTING.md para guía completa
 
 ### Formatos Soportados
-- PDFs con texto renderizado (ideal)
-- PDFs escaneados (funciona con OCR)
+- **PDFs digitales con texto** (ideal - extracción instantánea)
+- **PDFs escaneados** (requiere que la IA lea visualmente - más lento)
 - Tablas estructuradas (mejor rendimiento)
 - Planos/mapas con anotaciones de texto
 
 ### Limitaciones
-- Máximo 15 páginas procesadas
+- Máximo 10 páginas procesadas
 - Coordenadas deben estar en rango UTM 18S válido
-- Requiere conexión a internet (para IA y workers de Tesseract)
+- Requiere conexión a internet (para IA)
+- PDFs escaneados sin texto dependen 100% de IA Vision
 
 ## Ejemplo de Uso
 
+### Modo Normal
 ```typescript
-import { processWithOCR, generateGeoJSONFromData } from '@/lib/ocrPdfProcessor'
+import { processWithImprovedMethod, generateGeoJSONFromData } from '@/lib/improvedPdfProcessor'
 
 const handlePDF = async (file: File) => {
-  const result = await processWithOCR(file, (progress, total, status) => {
+  const result = await processWithImprovedMethod(file, (progress, total, status) => {
     console.log(`${progress}%: ${status}`)
   })
   
@@ -234,24 +302,56 @@ const handlePDF = async (file: File) => {
 }
 ```
 
+### Modo Diagnóstico
+```typescript
+import { runPDFDiagnostics, formatDiagnosticReport } from '@/lib/debugPdfProcessor'
+
+const diagnosePDF = async (file: File) => {
+  const result = await runPDFDiagnostics(file)
+  
+  if (result.success) {
+    console.log('✓ PDF is ready to process')
+    console.log(`Pages: ${result.pdfInfo?.numPages}`)
+    console.log(`Load time: ${result.timings.loadPdf}ms`)
+  } else {
+    console.error('✗ PDF has issues:', result.error)
+  }
+  
+  // Print detailed report
+  console.log(formatDiagnosticReport(result))
+}
+```
+
 ## Troubleshooting
 
-### OCR no funciona
-- Verifica que Tesseract pueda descargar el modelo de idioma
-- Revisa la consola por errores de CORS o red
+### Usar SIEMPRE el Modo Diagnóstico Primero
+Antes de reportar cualquier problema:
+1. Activa el modo diagnóstico
+2. Carga tu PDF
+3. Revisa los resultados
+4. Consulta TESTING.md para soluciones
+
+### PDF no se carga
+- **Diagnóstico**: Verifica el error específico en modo diagnóstico
+- **Solución**: PDF corrupto - abre y guarda nuevamente desde un visor
+
+### Texto extraído: 0 caracteres
+- **Diagnóstico**: El PDF es una imagen escaneada sin texto digital
+- **Impacto**: La IA deberá leer visualmente (más lento, menos preciso)
+- **Solución**: Considera usar PDFs digitales en lugar de escaneos
 
 ### Coordenadas no se extraen
-- Verifica que el PDF tenga texto seleccionable o esté escaneado con buena calidad
-- Revisa el tab "Páginas" para ver el texto OCR extraído
-- Las coordenadas deben estar en formato UTM con 6-7 dígitos
+- **Diagnóstico**: Revisa la muestra de texto en el modo diagnóstico
+- **Solución**: Verifica que el formato de coordenadas sea reconocible
+- Las coordenadas deben tener 6-7 dígitos para Este y Norte
 
 ### PDF tarda mucho
-- Normal para PDFs grandes (OCR es lento)
-- Considera optimizar el PDF antes (reducir páginas, mejorar calidad)
+- **Normal**: El análisis con IA es lento (~2-5s por página)
+- **Solución**: Limita el PDF a las páginas relevantes antes de cargar
 
 ### IA no encuentra coordenadas
-- El OCR debe extraer primero el texto correctamente
-- Verifica que las coordenadas estén en el rango válido UTM 18S
+- **Diagnóstico**: Verifica que el texto extraído contiene números
+- **Solución**: Asegúrate de que las coordenadas estén en rango UTM 18S válido
 
 ## Contribuciones
 

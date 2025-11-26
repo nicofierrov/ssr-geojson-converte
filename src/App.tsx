@@ -233,6 +233,7 @@ function App() {
     setProcessingProgress(0)
     setProcessingStatus('')
     setProcessingTimeMs(0)
+    setDiagnosticResult(null)
     toast.info('Reiniciado')
   }
 
@@ -310,7 +311,7 @@ function App() {
                 </div>
               )}
 
-              {diagnosticMode && diagnosticResult && (
+              {diagnosticMode && diagnosticResult && !isProcessing && (
                 <Alert className={diagnosticResult.success ? "border-green-500/50 bg-green-500/5" : "border-red-500/50 bg-red-500/5"}>
                   <Check className={`h-4 w-4 ${diagnosticResult.success ? 'text-green-600' : 'text-red-600'}`} />
                   <AlertDescription>
@@ -356,8 +357,8 @@ function App() {
                   </AlertDescription>
                 </Alert>
               )}
-              
-              {!isProcessing && (vertices.length > 0 || tanks.length > 0) && (
+
+              {!diagnosticMode && !isProcessing && (vertices.length > 0 || tanks.length > 0) && (
                 <>
                   {confidence < 0.6 && (
                     <Alert variant="destructive">
@@ -414,7 +415,7 @@ function App() {
             </div>
           </div>
 
-          {!isProcessing && (vertices.length > 0 || tanks.length > 0) && (
+          {!diagnosticMode && !isProcessing && (vertices.length > 0 || tanks.length > 0) && (
             <Tabs value={activeTab} onValueChange={setActiveTab}>
               <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="vertices">Vértices AS ({vertices.length})</TabsTrigger>
