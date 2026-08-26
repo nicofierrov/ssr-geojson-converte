@@ -11,8 +11,8 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
 import { Globe, Warning, Check, DownloadSimple, Clock, Sparkle } from '@phosphor-icons/react'
-import { processWithAIOnly, generateGeoJSONFromData } from '@/lib/aiOnlyProcessor'
-import type { VertexData, TankData, PageAnalysis } from '@/lib/aiOnlyProcessor'
+import { processWithImprovedMethod, generateGeoJSONFromData } from '@/lib/improvedPdfProcessor'
+import type { VertexData, TankData, PageAnalysis } from '@/lib/improvedPdfProcessor'
 import { toast } from 'sonner'
 
 function App() {
@@ -65,12 +65,12 @@ function App() {
       updateStepStatus(1, 'complete')
       updateStepStatus(2, 'active')
       
-      toast.info('Iniciando análisis con IA...', { 
+      toast.info('Iniciando análisis del PDF...', { 
         duration: 3000,
-        description: 'Procesando PDF sin OCR tradicional'
+        description: 'Extracción nativa de texto con PDF.js'
       })
       
-      const result = await processWithAIOnly(file, (current, total, status) => {
+      const result = await processWithImprovedMethod(file, (current, total, status) => {
         setProcessingProgress(current)
         setProcessingStatus(status)
         
@@ -118,7 +118,7 @@ function App() {
           fuente: file.name,
           fechaExtraccion: new Date().toISOString(),
           sistemaCoordinadas: 'UTM 18S → WGS84',
-          metodo: 'IA Vision (GPT-4o)',
+          metodo: 'PDF.js + extracción inteligente',
           tiempoProcesamiento: `${Math.round(result.processingTimeMs / 1000)}s`,
           paginasAnalizadas: result.pages.length
         })
