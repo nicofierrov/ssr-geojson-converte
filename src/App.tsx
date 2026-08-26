@@ -12,7 +12,7 @@ import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
 import { Globe, Warning, Check, DownloadSimple, Clock, Sparkle } from '@phosphor-icons/react'
 import { processWithImprovedMethod, generateGeoJSONFromData } from '@/lib/improvedPdfProcessor'
-import type { VertexData, TankData, PageAnalysis } from '@/lib/aiOnlyProcessor'
+import type { VertexData, TankData, PageAnalysis } from '@/lib/improvedPdfProcessor'
 import { toast } from 'sonner'
 
 function App() {
